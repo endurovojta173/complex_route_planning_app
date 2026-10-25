@@ -1,4 +1,4 @@
-import { Navigation, HardDriveDownload, FolderUp, Trash2, CheckCircle2 } from 'lucide-react';
+import { Navigation, HardDriveDownload, FolderUp, Trash2 } from 'lucide-react';
 import type { RouteStats, SearchLocation } from '../../types/route';
 import { SearchBar } from '../Search/SearchBar';
 
@@ -21,28 +21,32 @@ export function Navbar({
     <header className="navbar" id="app-navbar">
       <div className="navbar-brand">
         <div className="brand-icon">
-          <Navigation className="icon-pulse" size={22} />
+          <Navigation size={18} />
         </div>
         <div className="brand-info">
-          <h1 className="brand-title">RouteCraft</h1>
-          <span className="brand-subtitle">Interactive Route Planner & Branching</span>
+          <span className="brand-title">RouteCraft</span>
+          <span className="brand-subtitle">Route Planner</span>
         </div>
       </div>
 
       <div className="navbar-center">
         <SearchBar onSelectLocation={onSelectLocation} />
 
-        <div className="stat-pill highlight">
-          <span className="stat-label">Total Distance:</span>
-          <span className="stat-value">{stats.totalDistanceKm} km</span>
+        <div className="navbar-metrics">
+          <div className="metric-item">
+            <span className="metric-label">Vzdálenost</span>
+            <span className="metric-value">{stats.totalDistanceKm} km</span>
+          </div>
+          <div className="metric-divider" />
+          <div className="metric-item">
+            <span className="metric-label">Úseky</span>
+            <span className="metric-value">{stats.lineCount}</span>
+          </div>
         </div>
-        <div className="stat-pill">
-          <span className="stat-label">Segments:</span>
-          <span className="stat-value">{stats.lineCount}</span>
-        </div>
-        <div className="storage-badge" title="Automatically persisted to browser localStorage in GeoJSON format">
-          <CheckCircle2 size={14} className="badge-icon" />
-          <span>Local Cache Active</span>
+
+        <div className="storage-status" title="Data jsou automaticky ukládána v GeoJSON formátu do localStorage">
+          <span className="status-dot" />
+          <span>Uloženo lokálně</span>
         </div>
       </div>
 
@@ -51,33 +55,33 @@ export function Navbar({
           type="button"
           className="btn-action primary"
           onClick={onExport}
-          title="Export route to GeoJSON file"
+          title="Exportovat trasu do GeoJSON"
           id="btn-export-geojson"
         >
-          <HardDriveDownload size={16} />
-          <span>Export</span>
+          <HardDriveDownload size={14} />
+          <span>Exportovat</span>
         </button>
 
         <button
           type="button"
           className="btn-action secondary"
           onClick={onImportClick}
-          title="Import GeoJSON file"
+          title="Importovat GeoJSON"
           id="btn-import-geojson"
         >
-          <FolderUp size={16} />
-          <span>Import</span>
+          <FolderUp size={14} />
+          <span>Importovat</span>
         </button>
 
         <button
           type="button"
           className="btn-action danger"
           onClick={onClearClick}
-          title="Clear all features from map"
+          title="Vymazat vše z mapy"
           id="btn-clear-map"
         >
-          <Trash2 size={16} />
-          <span>Clear</span>
+          <Trash2 size={14} />
+          <span>Smazat</span>
         </button>
       </div>
     </header>

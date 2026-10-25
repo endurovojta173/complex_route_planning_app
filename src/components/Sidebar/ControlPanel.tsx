@@ -8,7 +8,6 @@ import {
   Route,
   MapPin,
   Pentagon,
-  GitBranch,
 } from 'lucide-react';
 import type { RouteStats, TileProviderId } from '../../types/route';
 import { TILE_PROVIDERS } from '../../utils/tileProviders';
@@ -96,36 +95,10 @@ export function ControlPanel({ stats, currentTileId, onTileSelect }: ControlPane
           </div>
         </div>
 
-        {/* Section: Route Planning & Branching Guide */}
-        <div className="panel-section guide-section">
-          <div className="section-title">
-            <GitBranch size={16} className="title-icon" />
-            <span>Branching & Snapping</span>
-          </div>
-          <p className="guide-text">
-            <strong>Snapping is active:</strong> Drawing near an existing route vertex will snap
-            automatically, enabling route branching, loops, and intersections without gaps.
-          </p>
-          <ul className="guide-list">
-            <li>
-              <strong>Draw Route:</strong> Select the Polyline icon on the top-left toolbar.
-            </li>
-            <li>
-              <strong>Branch:</strong> Hover near any existing route point until the snap guide appears.
-            </li>
-            <li>
-              <strong>Edit:</strong> Click the Edit icon to adjust existing vertices or add midpoints.
-            </li>
-            <li>
-              <strong>Cut / Split:</strong> Use the Cut tool to divide segments or polygons.
-            </li>
-          </ul>
-        </div>
-
         {/* Section: Technology & Architecture Notice */}
         <div className="panel-footer-note">
           <Info size={14} />
-          <span>Pure client-side Leaflet + Geoman + localStorage. Zero server tracking.</span>
+          <span>Lokální ukládání GeoJSON &bull; Bez serverů</span>
         </div>
       </div>
     </aside>
