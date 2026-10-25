@@ -1,4 +1,4 @@
-import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen } from 'lucide-react';
+import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen, Info } from 'lucide-react';
 import type { RouteStats, SearchLocation } from '../../types/route';
 import { SearchBar } from '../Search/SearchBar';
 
@@ -7,6 +7,7 @@ interface NavbarProps {
   activeMapName: string;
   savedMapsCount: number;
   onOpenMapsModal: () => void;
+  onOpenInfoModal: () => void;
   onExport: () => void;
   onImportClick: () => void;
   onClearClick: () => void;
@@ -18,6 +19,7 @@ export function Navbar({
   activeMapName,
   savedMapsCount,
   onOpenMapsModal,
+  onOpenInfoModal,
   onExport,
   onImportClick,
   onClearClick,
@@ -25,7 +27,16 @@ export function Navbar({
 }: NavbarProps) {
   return (
     <header className="navbar" id="app-navbar">
-      <div className="navbar-brand">
+      <div
+        className="navbar-brand clickable"
+        onClick={onOpenInfoModal}
+        title="Kliknutím zobrazit informace o aplikaci"
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') onOpenInfoModal();
+        }}
+      >
         <div className="brand-icon">
           <Navigation size={18} />
         </div>
@@ -71,6 +82,17 @@ export function Navbar({
         >
           <FolderOpen size={14} />
           <span>Mapy ({savedMapsCount})</span>
+        </button>
+
+        <button
+          type="button"
+          className="btn-action secondary info-btn"
+          onClick={onOpenInfoModal}
+          title="O aplikaci, autorovi a lokálním ukládání"
+          id="btn-info-modal"
+        >
+          <Info size={14} />
+          <span>Info</span>
         </button>
 
         <button

@@ -4,6 +4,7 @@ import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
 import { ControlPanel } from './components/Sidebar/ControlPanel';
 import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
+import { InfoModal } from './components/Info/InfoModal';
 import type { RouteStats, TileProviderId, SearchLocation, SavedMapItem } from './types/route';
 import {
   downloadGeoJsonFile,
@@ -21,6 +22,7 @@ export default function App() {
   const [savedMaps, setSavedMaps] = useState<SavedMapItem[]>(() => getAllSavedMaps());
   const [activeMapId, setActiveMapIdState] = useState<string>(() => getActiveMapId());
   const [isMapsModalOpen, setIsMapsModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   const activeMap = savedMaps.find((m) => m.id === activeMapId) || savedMaps[0];
 
@@ -229,6 +231,7 @@ export default function App() {
         activeMapName={activeMap?.name || 'Výchozí trasa'}
         savedMapsCount={savedMaps.length}
         onOpenMapsModal={() => setIsMapsModalOpen(true)}
+        onOpenInfoModal={() => setIsInfoModalOpen(true)}
         onExport={handleExport}
         onImportClick={handleImportClick}
         onClearClick={handleClear}
@@ -240,6 +243,7 @@ export default function App() {
           stats={stats}
           currentTileId={currentTileId}
           onTileSelect={setCurrentTileId}
+          onOpenInfoModal={() => setIsInfoModalOpen(true)}
         />
 
         <RouteMap
@@ -263,6 +267,12 @@ export default function App() {
         onDuplicateMap={handleDuplicateMap}
         onDeleteMap={handleDeleteMap}
         onRenameMap={handleRenameMap}
+      />
+
+      {/* Info & About Modal */}
+      <InfoModal
+        isOpen={isInfoModalOpen}
+        onClose={() => setIsInfoModalOpen(false)}
       />
 
       {/* Hidden file input for GeoJSON import */}

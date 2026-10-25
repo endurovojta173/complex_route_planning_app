@@ -16,9 +16,15 @@ interface ControlPanelProps {
   stats: RouteStats;
   currentTileId: TileProviderId;
   onTileSelect: (id: TileProviderId) => void;
+  onOpenInfoModal?: () => void;
 }
 
-export function ControlPanel({ stats, currentTileId, onTileSelect }: ControlPanelProps) {
+export function ControlPanel({
+  stats,
+  currentTileId,
+  onTileSelect,
+  onOpenInfoModal,
+}: ControlPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   return (
@@ -96,10 +102,15 @@ export function ControlPanel({ stats, currentTileId, onTileSelect }: ControlPane
         </div>
 
         {/* Section: Technology & Architecture Notice */}
-        <div className="panel-footer-note">
+        <button
+          type="button"
+          className="panel-footer-note clickable"
+          onClick={onOpenInfoModal}
+          title="Zobrazit podrobnosti o aplikaci a ukládání dat"
+        >
           <Info size={14} />
           <span>Lokální ukládání GeoJSON &bull; Bez serverů</span>
-        </div>
+        </button>
       </div>
     </aside>
   );
