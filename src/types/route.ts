@@ -25,6 +25,15 @@ export interface StoredRouteData {
   geoJson: FeatureCollection;
 }
 
+export interface SavedMapItem {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  geoJson: FeatureCollection;
+  stats: RouteStats;
+}
+
 export interface SearchLocation {
   id: string | number;
   name: string;

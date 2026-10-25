@@ -1,7 +1,9 @@
 import type { FeatureCollection } from 'geojson';
-import type { RouteStats } from '../types/route';
+import type { RouteStats, SavedMapItem } from '../types/route';
 
-export const STORAGE_KEY = 'complex_route_planner_geojson';
+export const LEGACY_STORAGE_KEY = 'complex_route_planner_geojson';
+export const MAPS_LIST_KEY = 'complex_route_planner_maps_list';
+export const ACTIVE_MAP_ID_KEY = 'complex_route_planner_active_map_id';
 
 /**
  * Calculates distance in kilometers between two lat/lng coordinates (Haversine formula).
@@ -77,48 +79,256 @@ export function calculateRouteStats(collection: FeatureCollection): RouteStats {
 }
 
 /**
- * Persists the given GeoJSON collection to localStorage.
+ * Creates an empty GeoJSON FeatureCollection.
+ */
+export function createEmptyFeatureCollection(): FeatureCollection {
+  return {
+    type: 'FeatureCollection',
+    features: [],
+  };
+}
+
+/**
+ * Retrieves all saved maps from localStorage. Automatically handles migration from legacy single-map storage.
+ */
+export function getAllSavedMaps(): SavedMapItem[] {
+  try {
+    const raw = localStorage.getItem(MAPS_LIST_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+
+    // Check for legacy single-map storage
+    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    let initialCollection = createEmptyFeatureCollection();
+    if (legacyRaw) {
+      try {
+        const parsedLegacy = JSON.parse(legacyRaw);
+        if (parsedLegacy && parsedLegacy.type === 'FeatureCollection') {
+          initialCollection = parsedLegacy;
+        }
+      } catch (e) {
+        console.error('Legacy migration parse error:', e);
+      }
+    }
+
+    const defaultMap: SavedMapItem = {
+      id: 'map_' + Date.now(),
+      name: 'Výchozí trasa',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      geoJson: initialCollection,
+      stats: calculateRouteStats(initialCollection),
+    };
+
+    const initialList = [defaultMap];
+    localStorage.setItem(MAPS_LIST_KEY, JSON.stringify(initialList));
+    localStorage.setItem(ACTIVE_MAP_ID_KEY, defaultMap.id);
+
+    return initialList;
+  } catch (error) {
+    console.error('Failed to get saved maps from localStorage:', error);
+    return [];
+  }
+}
+
+/**
+ * Retrieves the currently active map ID.
+ */
+export function getActiveMapId(): string {
+  try {
+    const activeId = localStorage.getItem(ACTIVE_MAP_ID_KEY);
+    if (activeId) return activeId;
+
+    const maps = getAllSavedMaps();
+    if (maps.length > 0) {
+      localStorage.setItem(ACTIVE_MAP_ID_KEY, maps[0].id);
+      return maps[0].id;
+    }
+    return '';
+  } catch (error) {
+    console.error('Failed to get active map ID:', error);
+    return '';
+  }
+}
+
+/**
+ * Sets the currently active map ID.
+ */
+export function setActiveMapId(id: string): void {
+  try {
+    localStorage.setItem(ACTIVE_MAP_ID_KEY, id);
+  } catch (error) {
+    console.error('Failed to set active map ID:', error);
+  }
+}
+
+/**
+ * Saves or updates a map in the local cache.
+ */
+export function saveMapItem(mapItem: SavedMapItem): void {
+  try {
+    const maps = getAllSavedMaps();
+    const existingIndex = maps.findIndex((m) => m.id === mapItem.id);
+
+    if (existingIndex >= 0) {
+      maps[existingIndex] = {
+        ...mapItem,
+        updatedAt: new Date().toISOString(),
+      };
+    } else {
+      maps.push(mapItem);
+    }
+
+    localStorage.setItem(MAPS_LIST_KEY, JSON.stringify(maps));
+    // Also update legacy key for backward compatibility
+    if (mapItem.id === getActiveMapId()) {
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(mapItem.geoJson));
+    }
+  } catch (error) {
+    console.error('Failed to save map item:', error);
+  }
+}
+
+/**
+ * Loads the currently active map GeoJSON from storage.
+ */
+export function loadGeoJsonFromStorage(): FeatureCollection {
+  try {
+    const activeId = getActiveMapId();
+    const maps = getAllSavedMaps();
+    const activeMap = maps.find((m) => m.id === activeId);
+    if (activeMap) {
+      return activeMap.geoJson;
+    }
+    // Fallback to legacy key
+    const raw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
+        return parsed;
+      }
+    }
+  } catch (error) {
+    console.error('Failed to load GeoJSON from storage:', error);
+  }
+  return createEmptyFeatureCollection();
+}
+
+/**
+ * Saves GeoJSON to the currently active map in localStorage.
  */
 export function saveGeoJsonToStorage(collection: FeatureCollection): void {
   try {
-    const serialized = JSON.stringify(collection);
-    localStorage.setItem(STORAGE_KEY, serialized);
-  } catch (error) {
-    console.error('Failed to save GeoJSON to localStorage:', error);
-  }
-}
-
-/**
- * Loads the saved GeoJSON collection from localStorage if available.
- */
-export function loadGeoJsonFromStorage(): FeatureCollection | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-      return parsed as FeatureCollection;
+    const activeId = getActiveMapId();
+    const maps = getAllSavedMaps();
+    const activeMap = maps.find((m) => m.id === activeId);
+    if (activeMap) {
+      activeMap.geoJson = collection;
+      activeMap.stats = calculateRouteStats(collection);
+      activeMap.updatedAt = new Date().toISOString();
+      localStorage.setItem(MAPS_LIST_KEY, JSON.stringify(maps));
     }
-    return null;
+    localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(collection));
   } catch (error) {
-    console.error('Failed to load GeoJSON from localStorage:', error);
-    return null;
+    console.error('Failed to save GeoJSON to storage:', error);
   }
 }
 
 /**
- * Clears saved GeoJSON from localStorage.
+ * Creates a brand new map in localStorage.
  */
-export function clearGeoJsonStorage(): void {
+export function createNewMap(name = 'Nová trasa'): SavedMapItem {
+  const emptyGeoJson = createEmptyFeatureCollection();
+  const newMap: SavedMapItem = {
+    id: 'map_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    name,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    geoJson: emptyGeoJson,
+    stats: {
+      totalDistanceKm: 0,
+      featureCount: 0,
+      lineCount: 0,
+      polygonCount: 0,
+      markerCount: 0,
+    },
+  };
+
+  saveMapItem(newMap);
+  setActiveMapId(newMap.id);
+  return newMap;
+}
+
+/**
+ * Duplicates an existing map.
+ */
+export function duplicateMapItem(id: string): SavedMapItem | null {
+  const maps = getAllSavedMaps();
+  const original = maps.find((m) => m.id === id);
+  if (!original) return null;
+
+  const duplicated: SavedMapItem = {
+    ...original,
+    id: 'map_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+    name: `${original.name} (Kopie)`,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    // Deep clone GeoJSON
+    geoJson: JSON.parse(JSON.stringify(original.geoJson)),
+  };
+
+  saveMapItem(duplicated);
+  return duplicated;
+}
+
+/**
+ * Deletes a map from localStorage.
+ */
+export function deleteMapItem(id: string): SavedMapItem[] {
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    let maps = getAllSavedMaps();
+    maps = maps.filter((m) => m.id !== id);
+
+    // If all maps were deleted, generate a fresh empty map
+    if (maps.length === 0) {
+      const defaultMap: SavedMapItem = {
+        id: 'map_' + Date.now(),
+        name: 'Moje trasa',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        geoJson: createEmptyFeatureCollection(),
+        stats: {
+          totalDistanceKm: 0,
+          featureCount: 0,
+          lineCount: 0,
+          polygonCount: 0,
+          markerCount: 0,
+        },
+      };
+      maps = [defaultMap];
+    }
+
+    localStorage.setItem(MAPS_LIST_KEY, JSON.stringify(maps));
+
+    // If the active map was deleted, point to the first available map
+    if (getActiveMapId() === id) {
+      setActiveMapId(maps[0].id);
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(maps[0].geoJson));
+    }
+
+    return maps;
   } catch (error) {
-    console.error('Failed to clear GeoJSON storage:', error);
+    console.error('Failed to delete map item:', error);
+    return getAllSavedMaps();
   }
 }
 
 /**
- * Triggers a client-side file download of the current GeoJSON data.
+ * Triggers a client-side file download of the GeoJSON data.
  */
 export function downloadGeoJsonFile(collection: FeatureCollection, filename = 'route-plan.geojson'): void {
   const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(collection, null, 2));

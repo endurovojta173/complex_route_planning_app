@@ -1,9 +1,12 @@
-import { Navigation, HardDriveDownload, FolderUp, Trash2 } from 'lucide-react';
+import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen } from 'lucide-react';
 import type { RouteStats, SearchLocation } from '../../types/route';
 import { SearchBar } from '../Search/SearchBar';
 
 interface NavbarProps {
   stats: RouteStats;
+  activeMapName: string;
+  savedMapsCount: number;
+  onOpenMapsModal: () => void;
   onExport: () => void;
   onImportClick: () => void;
   onClearClick: () => void;
@@ -12,6 +15,9 @@ interface NavbarProps {
 
 export function Navbar({
   stats,
+  activeMapName,
+  savedMapsCount,
+  onOpenMapsModal,
   onExport,
   onImportClick,
   onClearClick,
@@ -44,13 +50,29 @@ export function Navbar({
           </div>
         </div>
 
-        <div className="storage-status" title="Data jsou automaticky ukládána v GeoJSON formátu do localStorage">
+        <button
+          type="button"
+          className="storage-status clickable"
+          onClick={onOpenMapsModal}
+          title="Kliknutím otevřít správu uložených map"
+        >
           <span className="status-dot" />
-          <span>Uloženo lokálně</span>
-        </div>
+          <span className="status-map-name">{activeMapName}</span>
+        </button>
       </div>
 
       <div className="navbar-actions">
+        <button
+          type="button"
+          className="btn-action secondary maps-btn"
+          onClick={onOpenMapsModal}
+          title="Správa uložených map"
+          id="btn-saved-maps"
+        >
+          <FolderOpen size={14} />
+          <span>Mapy ({savedMapsCount})</span>
+        </button>
+
         <button
           type="button"
           className="btn-action primary"
@@ -59,7 +81,7 @@ export function Navbar({
           id="btn-export-geojson"
         >
           <HardDriveDownload size={14} />
-          <span>Exportovat</span>
+          <span>Export</span>
         </button>
 
         <button
@@ -70,7 +92,7 @@ export function Navbar({
           id="btn-import-geojson"
         >
           <FolderUp size={14} />
-          <span>Importovat</span>
+          <span>Import</span>
         </button>
 
         <button

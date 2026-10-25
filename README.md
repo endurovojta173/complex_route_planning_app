@@ -18,6 +18,7 @@ This tool was designed and developed to solve a complex route planning and coord
 
 - **Interactive Drawing Engine:** Draw polylines, polygons, markers, and shapes with Leaflet and Geoman.
 - **Route Branching & Snapping:** Automatic vertex snapping allows branching from existing routes, loops, and intersections with zero gap.
+- **Multi-Map Local Cache:** Save, name, duplicate, switch between, and manage multiple independent routes and event maps directly in browser `localStorage`.
 - **Pure Client-Side Persistence:** Automatically saves routes and features in GeoJSON format to `localStorage`. No backend or database required.
 - **Multi-Basemap Support:** Switch seamlessly between OpenStreetMap Standard and Esri Satellite.
 - **Route Analytics:** Real-time distance measurement (km / mi), waypoint tracking, and shape counters.

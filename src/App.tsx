@@ -3,26 +3,42 @@ import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
 import { ControlPanel } from './components/Sidebar/ControlPanel';
-import type { RouteStats, TileProviderId, SearchLocation } from './types/route';
+import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
+import type { RouteStats, TileProviderId, SearchLocation, SavedMapItem } from './types/route';
 import {
-  clearGeoJsonStorage,
   downloadGeoJsonFile,
-  loadGeoJsonFromStorage,
+  getAllSavedMaps,
+  getActiveMapId,
+  setActiveMapId,
+  saveMapItem,
+  createNewMap,
+  duplicateMapItem,
+  deleteMapItem,
 } from './utils/geoJsonStorage';
 import './App.css';
 
 export default function App() {
-  const [stats, setStats] = useState<RouteStats>({
-    totalDistanceKm: 0,
-    featureCount: 0,
-    lineCount: 0,
-    polygonCount: 0,
-    markerCount: 0,
+  const [savedMaps, setSavedMaps] = useState<SavedMapItem[]>(() => getAllSavedMaps());
+  const [activeMapId, setActiveMapIdState] = useState<string>(() => getActiveMapId());
+  const [isMapsModalOpen, setIsMapsModalOpen] = useState(false);
+
+  const activeMap = savedMaps.find((m) => m.id === activeMapId) || savedMaps[0];
+
+  const [stats, setStats] = useState<RouteStats>(() => {
+    return (
+      activeMap?.stats || {
+        totalDistanceKm: 0,
+        featureCount: 0,
+        lineCount: 0,
+        polygonCount: 0,
+        markerCount: 0,
+      }
+    );
   });
 
   const [currentTileId, setCurrentTileId] = useState<TileProviderId>('osm');
   const [currentGeoJson, setCurrentGeoJson] = useState<FeatureCollection | null>(() => {
-    return loadGeoJsonFromStorage();
+    return activeMap?.geoJson || null;
   });
   const [importedGeoJson, setImportedGeoJson] = useState<FeatureCollection | null>(null);
   const [clearTrigger, setClearTrigger] = useState(0);
@@ -38,15 +54,102 @@ export default function App() {
     }, 3500);
   };
 
+  // Synchronize GeoJSON changes to active map in localStorage
+  const handleGeoJsonChange = (geo: FeatureCollection) => {
+    setCurrentGeoJson(geo);
+    if (activeMap) {
+      const updatedMap: SavedMapItem = {
+        ...activeMap,
+        geoJson: geo,
+        stats,
+        updatedAt: new Date().toISOString(),
+      };
+      saveMapItem(updatedMap);
+      setSavedMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    }
+  };
+
+  // Switch to another saved map
+  const handleSelectMap = (map: SavedMapItem) => {
+    setActiveMapId(map.id);
+    setActiveMapIdState(map.id);
+    setClearTrigger((prev) => prev + 1);
+
+    setTimeout(() => {
+      setImportedGeoJson(map.geoJson);
+      setCurrentGeoJson(map.geoJson);
+      setStats(map.stats);
+    }, 20);
+
+    setIsMapsModalOpen(false);
+    showNotification(`Načtena mapa: ${map.name}`);
+  };
+
+  // Create new blank map
+  const handleCreateNewMap = (name?: string) => {
+    const newMap = createNewMap(name || `Trasa ${savedMaps.length + 1}`);
+    const updated = getAllSavedMaps();
+    setSavedMaps(updated);
+    setActiveMapIdState(newMap.id);
+    setClearTrigger((prev) => prev + 1);
+    setCurrentGeoJson(newMap.geoJson);
+    setStats(newMap.stats);
+    setIsMapsModalOpen(false);
+    showNotification(`Vytvořena nová mapa: ${newMap.name}`);
+  };
+
+  // Duplicate map
+  const handleDuplicateMap = (id: string) => {
+    const dup = duplicateMapItem(id);
+    if (dup) {
+      setSavedMaps(getAllSavedMaps());
+      showNotification(`Vytvořena kopie mapy: ${dup.name}`);
+    }
+  };
+
+  // Delete map
+  const handleDeleteMap = (id: string) => {
+    const updated = deleteMapItem(id);
+    setSavedMaps(updated);
+    const newActiveId = getActiveMapId();
+    setActiveMapIdState(newActiveId);
+
+    const targetMap = updated.find((m) => m.id === newActiveId) || updated[0];
+    if (targetMap) {
+      setClearTrigger((prev) => prev + 1);
+      setTimeout(() => {
+        setImportedGeoJson(targetMap.geoJson);
+        setCurrentGeoJson(targetMap.geoJson);
+        setStats(targetMap.stats);
+      }, 20);
+    }
+    showNotification('Mapa byla smazána');
+  };
+
+  // Rename map
+  const handleRenameMap = (id: string, newName: string) => {
+    const target = savedMaps.find((m) => m.id === id);
+    if (target) {
+      const updated: SavedMapItem = {
+        ...target,
+        name: newName,
+        updatedAt: new Date().toISOString(),
+      };
+      saveMapItem(updated);
+      setSavedMaps(getAllSavedMaps());
+      showNotification(`Přejmenováno na: ${newName}`);
+    }
+  };
+
   const handleExport = () => {
-    const dataToExport = currentGeoJson || loadGeoJsonFromStorage();
+    const dataToExport = currentGeoJson || activeMap?.geoJson;
     if (!dataToExport || dataToExport.features.length === 0) {
-      showNotification('No route or shapes drawn yet to export.');
+      showNotification('Na mapě zatím nejsou žádné nakreslené prvky k exportu.');
       return;
     }
-    const timestamp = new Date().toISOString().slice(0, 10);
-    downloadGeoJsonFile(dataToExport, `route-plan-${timestamp}.geojson`);
-    showNotification('GeoJSON route exported successfully.');
+    const cleanName = (activeMap?.name || 'route-plan').replace(/\s+/g, '_');
+    downloadGeoJsonFile(dataToExport, `${cleanName}.geojson`);
+    showNotification(`Mapa "${activeMap?.name}" byla exportována.`);
   };
 
   const handleImportClick = () => {
@@ -64,15 +167,14 @@ export default function App() {
         const parsed = JSON.parse(text);
         if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
           setImportedGeoJson(parsed as FeatureCollection);
-          showNotification(`Imported ${parsed.features.length} features.`);
+          showNotification(`Importováno ${parsed.features.length} prvků do aktivní mapy.`);
         } else {
-          showNotification('Invalid GeoJSON: Expected a FeatureCollection.');
+          showNotification('Neplatný GeoJSON: očekáván objekt FeatureCollection.');
         }
       } catch (err) {
         console.error('Failed to parse uploaded GeoJSON:', err);
-        showNotification('Error reading GeoJSON file.');
+        showNotification('Chyba při čtení GeoJSON souboru.');
       }
-      // Reset input value to allow re-uploading the same file
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -82,21 +184,35 @@ export default function App() {
 
   const handleClear = () => {
     if (stats.featureCount === 0) {
-      showNotification('Map is already empty.');
+      showNotification('Mapa je již prázdná.');
       return;
     }
-    const confirmed = window.confirm('Are you sure you want to clear all drawn routes and features?');
+    const confirmed = window.confirm(
+      `Opravdu chcete vymazat všechny nakreslené prvky z mapy "${activeMap?.name}"?`
+    );
     if (confirmed) {
-      clearGeoJsonStorage();
       setClearTrigger((prev) => prev + 1);
-      setStats({
+      const emptyStats: RouteStats = {
         totalDistanceKm: 0,
         featureCount: 0,
         lineCount: 0,
         polygonCount: 0,
         markerCount: 0,
-      });
-      showNotification('Map and cache cleared.');
+      };
+      setStats(emptyStats);
+
+      if (activeMap) {
+        const clearedMap: SavedMapItem = {
+          ...activeMap,
+          geoJson: { type: 'FeatureCollection', features: [] },
+          stats: emptyStats,
+          updatedAt: new Date().toISOString(),
+        };
+        saveMapItem(clearedMap);
+        setSavedMaps((prev) => prev.map((m) => (m.id === clearedMap.id ? clearedMap : m)));
+      }
+
+      showNotification('Všechny prvky byly z mapy odstraněny.');
     }
   };
 
@@ -110,6 +226,9 @@ export default function App() {
     <div className="app-container">
       <Navbar
         stats={stats}
+        activeMapName={activeMap?.name || 'Výchozí trasa'}
+        savedMapsCount={savedMaps.length}
+        onOpenMapsModal={() => setIsMapsModalOpen(true)}
         onExport={handleExport}
         onImportClick={handleImportClick}
         onClearClick={handleClear}
@@ -126,12 +245,25 @@ export default function App() {
         <RouteMap
           tileProviderId={currentTileId}
           onStatsChange={setStats}
-          onGeoJsonChange={setCurrentGeoJson}
+          onGeoJsonChange={handleGeoJsonChange}
           importGeoJsonData={importedGeoJson}
           clearTrigger={clearTrigger}
           searchTarget={searchTarget}
         />
       </main>
+
+      {/* Saved Maps Manager Modal */}
+      <SavedMapsModal
+        isOpen={isMapsModalOpen}
+        onClose={() => setIsMapsModalOpen(false)}
+        maps={savedMaps}
+        activeMapId={activeMapId}
+        onSelectMap={handleSelectMap}
+        onCreateNewMap={handleCreateNewMap}
+        onDuplicateMap={handleDuplicateMap}
+        onDeleteMap={handleDeleteMap}
+        onRenameMap={handleRenameMap}
+      />
 
       {/* Hidden file input for GeoJSON import */}
       <input
