@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import '@geoman-io/leaflet-geoman-free';
 import '@geoman-io/leaflet-geoman-free/dist/leaflet-geoman.css';
 import type { FeatureCollection } from 'geojson';
-import type { RouteStats, TileProviderId } from '../../types/route';
+import type { RouteStats, TileProviderId, SearchLocation } from '../../types/route';
 import { TILE_PROVIDERS } from '../../utils/tileProviders';
 import {
   calculateRouteStats,
@@ -35,6 +35,7 @@ interface RouteMapProps {
   onGeoJsonChange?: (geoJson: FeatureCollection) => void;
   importGeoJsonData: FeatureCollection | null;
   clearTrigger: number;
+  searchTarget: SearchLocation | null;
 }
 
 export function RouteMap({
@@ -43,11 +44,13 @@ export function RouteMap({
   onGeoJsonChange,
   importGeoJsonData,
   clearTrigger,
+  searchTarget,
 }: RouteMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const searchMarkerRef = useRef<L.Layer | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
   const onStatsChangeRef = useRef(onStatsChange);
@@ -75,7 +78,7 @@ export function RouteMap({
           features.push({
             type: 'Feature',
             properties: {
-              stroke: '#6366f1',
+              stroke: '#10b981',
               'stroke-width': 4,
             },
             geometry: geo,
@@ -166,8 +169,8 @@ export function RouteMap({
 
     // Set styling options for newly drawn shapes
     map.pm.setPathOptions({
-      color: '#6366f1',
-      fillColor: '#818cf8',
+      color: '#10b981',
+      fillColor: '#34d399',
       fillOpacity: 0.25,
       weight: 4,
     });
@@ -202,10 +205,10 @@ export function RouteMap({
       try {
         const geoLayer = L.geoJSON(savedGeoJson, {
           style: {
-            color: '#6366f1',
+            color: '#10b981',
             weight: 4,
             opacity: 0.9,
-            fillColor: '#818cf8',
+            fillColor: '#34d399',
             fillOpacity: 0.25,
           },
           onEachFeature: (_feature, layer) => {
@@ -266,10 +269,10 @@ export function RouteMap({
     try {
       const geoLayer = L.geoJSON(importGeoJsonData, {
         style: {
-          color: '#38bdf8',
+          color: '#059669',
           weight: 4,
           opacity: 0.9,
-          fillColor: '#38bdf8',
+          fillColor: '#10b981',
           fillOpacity: 0.25,
         },
         onEachFeature: (_feature, layer) => {
@@ -295,6 +298,65 @@ export function RouteMap({
     drawnItemsRef.current.clearLayers();
     syncLayers();
   }, [clearTrigger, syncLayers]);
+
+  // Handle centering the map on a searched location
+  useEffect(() => {
+    if (!searchTarget || !mapInstanceRef.current) return;
+
+    const map = mapInstanceRef.current;
+    const { lat, lon, name, boundingBox } = searchTarget;
+
+    // Remove previous search marker if any
+    if (searchMarkerRef.current && map.hasLayer(searchMarkerRef.current)) {
+      map.removeLayer(searchMarkerRef.current);
+      searchMarkerRef.current = null;
+    }
+
+    // Center map with smooth fly animation
+    if (boundingBox && boundingBox.length === 4) {
+      // Nominatim boundingbox: [south, north, west, east]
+      const [south, north, west, east] = boundingBox.map(Number);
+      if (!isNaN(south) && !isNaN(north) && !isNaN(west) && !isNaN(east)) {
+        map.flyToBounds(
+          [
+            [south, west],
+            [north, east],
+          ],
+          {
+            padding: [60, 60],
+            maxZoom: 16,
+            duration: 1.5,
+          }
+        );
+      } else {
+        map.flyTo([lat, lon], 15, { duration: 1.5 });
+      }
+    } else {
+      map.flyTo([lat, lon], 15, { duration: 1.5 });
+    }
+
+    // Add a pulsing visual marker for the searched place (ignored by Geoman)
+    const marker = L.circleMarker([lat, lon], {
+      radius: 9,
+      color: '#047857',
+      weight: 3,
+      fillColor: '#10b981',
+      fillOpacity: 0.85,
+      pmIgnore: true,
+    }).addTo(map);
+
+    const displayName = name.split(',')[0];
+    marker
+      .bindPopup(
+        `<div style="font-family:Inter,sans-serif; min-width: 140px;">
+          <div style="font-weight:600; font-size:13px; color:#0f172a;">📍 ${displayName}</div>
+          <div style="font-size:11px; color:#64748b; margin-top:2px;">${name}</div>
+        </div>`
+      )
+      .openPopup();
+
+    searchMarkerRef.current = marker;
+  }, [searchTarget]);
 
   return (
     <div className="map-wrapper" id="route-map-container">

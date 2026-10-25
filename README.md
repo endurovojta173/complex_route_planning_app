@@ -19,9 +19,10 @@ This tool was designed and developed to solve a complex route planning and coord
 - **Interactive Drawing Engine:** Draw polylines, polygons, markers, and shapes with Leaflet and Geoman.
 - **Route Branching & Snapping:** Automatic vertex snapping allows branching from existing routes, loops, and intersections with zero gap.
 - **Pure Client-Side Persistence:** Automatically saves routes and features in GeoJSON format to `localStorage`. No backend or database required.
-- **Multi-Basemap Support:** Switch seamlessly between CartoDB Dark Matter, OpenStreetMap, CartoDB Positron, and Esri Satellite.
+- **Multi-Basemap Support:** Switch seamlessly between OpenStreetMap Standard and Esri Satellite.
 - **Route Analytics:** Real-time distance measurement (km / mi), waypoint tracking, and shape counters.
 - **GeoJSON Import & Export:** Export your route data to `.geojson` files or import existing GeoJSON collections.
+- **Location Search & Autocomplete:** Real-time geocoding search powered by OpenStreetMap Nominatim with smooth animated fly-to centering and location highlight pins.
 - **Docker-Only Ready:** Multi-stage `Dockerfile` and `docker-compose.yml` allowing you to run and develop the entire application using only Docker—no Node.js or npm installation required.
 
 ---

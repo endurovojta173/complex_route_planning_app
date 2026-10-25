@@ -8,7 +8,7 @@ export interface RouteStats {
   markerCount: number;
 }
 
-export type TileProviderId = 'osm' | 'dark' | 'satellite' | 'terrain';
+export type TileProviderId = 'osm' | 'satellite';
 
 export interface TileProvider {
   id: TileProviderId;
@@ -23,4 +23,13 @@ export interface StoredRouteData {
   timestamp: string;
   name: string;
   geoJson: FeatureCollection;
+}
+
+export interface SearchLocation {
+  id: string | number;
+  name: string;
+  lat: number;
+  lon: number;
+  type?: string;
+  boundingBox?: [string, string, string, string];
 }

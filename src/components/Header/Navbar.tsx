@@ -1,14 +1,22 @@
 import { Navigation, HardDriveDownload, FolderUp, Trash2, CheckCircle2 } from 'lucide-react';
-import type { RouteStats } from '../../types/route';
+import type { RouteStats, SearchLocation } from '../../types/route';
+import { SearchBar } from '../Search/SearchBar';
 
 interface NavbarProps {
   stats: RouteStats;
   onExport: () => void;
   onImportClick: () => void;
   onClearClick: () => void;
+  onSelectLocation: (location: SearchLocation) => void;
 }
 
-export function Navbar({ stats, onExport, onImportClick, onClearClick }: NavbarProps) {
+export function Navbar({
+  stats,
+  onExport,
+  onImportClick,
+  onClearClick,
+  onSelectLocation,
+}: NavbarProps) {
   return (
     <header className="navbar" id="app-navbar">
       <div className="navbar-brand">
@@ -22,6 +30,8 @@ export function Navbar({ stats, onExport, onImportClick, onClearClick }: NavbarP
       </div>
 
       <div className="navbar-center">
+        <SearchBar onSelectLocation={onSelectLocation} />
+
         <div className="stat-pill highlight">
           <span className="stat-label">Total Distance:</span>
           <span className="stat-value">{stats.totalDistanceKm} km</span>

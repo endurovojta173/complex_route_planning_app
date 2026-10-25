@@ -3,7 +3,7 @@ import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
 import { ControlPanel } from './components/Sidebar/ControlPanel';
-import type { RouteStats, TileProviderId } from './types/route';
+import type { RouteStats, TileProviderId, SearchLocation } from './types/route';
 import {
   clearGeoJsonStorage,
   downloadGeoJsonFile,
@@ -20,12 +20,13 @@ export default function App() {
     markerCount: 0,
   });
 
-  const [currentTileId, setCurrentTileId] = useState<TileProviderId>('dark');
+  const [currentTileId, setCurrentTileId] = useState<TileProviderId>('osm');
   const [currentGeoJson, setCurrentGeoJson] = useState<FeatureCollection | null>(() => {
     return loadGeoJsonFromStorage();
   });
   const [importedGeoJson, setImportedGeoJson] = useState<FeatureCollection | null>(null);
   const [clearTrigger, setClearTrigger] = useState(0);
+  const [searchTarget, setSearchTarget] = useState<SearchLocation | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -99,6 +100,12 @@ export default function App() {
     }
   };
 
+  const handleSelectLocation = (location: SearchLocation) => {
+    setSearchTarget(location);
+    const shortName = location.name.split(',')[0];
+    showNotification(`Vycentrováno na: ${shortName}`);
+  };
+
   return (
     <div className="app-container">
       <Navbar
@@ -106,6 +113,7 @@ export default function App() {
         onExport={handleExport}
         onImportClick={handleImportClick}
         onClearClick={handleClear}
+        onSelectLocation={handleSelectLocation}
       />
 
       <main className="main-content">
@@ -121,6 +129,7 @@ export default function App() {
           onGeoJsonChange={setCurrentGeoJson}
           importGeoJsonData={importedGeoJson}
           clearTrigger={clearTrigger}
+          searchTarget={searchTarget}
         />
       </main>
 
