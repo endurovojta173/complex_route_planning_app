@@ -1093,15 +1093,29 @@ export function RouteMap({
       pmIgnore: true,
     }).addTo(map);
 
-    const displayName = name.split(',')[0];
+    const displayName = name.split(',')[0].trim();
     marker
       .bindPopup(
-        `<div style="font-family:Inter,sans-serif; min-width: 140px;">
-          <div style="font-weight:600; font-size:13px; color:#0f172a;">📍 ${displayName}</div>
-          <div style="font-size:11px; color:#64748b; margin-top:2px;">${name}</div>
-        </div>`
+        `<div style="font-family:Inter,sans-serif; font-weight:600; font-size:13px; color:#0f172a; padding: 1px 6px 1px 0; white-space: nowrap;">
+          ${displayName}
+        </div>`,
+        {
+          closeButton: true,
+          closeOnClick: false,
+          autoClose: false,
+        }
       )
       .openPopup();
+
+    // When clicking the close button 'x' (or popupclose), remove the searched marker from map
+    marker.on('popupclose', () => {
+      if (mapInstanceRef.current && mapInstanceRef.current.hasLayer(marker)) {
+        mapInstanceRef.current.removeLayer(marker);
+      }
+      if (searchMarkerRef.current === marker) {
+        searchMarkerRef.current = null;
+      }
+    });
 
     searchMarkerRef.current = marker;
   }, [searchTarget]);
