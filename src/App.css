@@ -1827,6 +1827,12 @@
   border: 1px solid rgba(46, 189, 127, 0.3);
 }
 
+.popup-direction-badge.bidirectional {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+}
+
 .popup-direction-badge.inactive {
   color: #94a3b8;
   background: rgba(148, 163, 184, 0.12);
@@ -1856,6 +1862,12 @@
   align-items: center;
   justify-content: center;
   transition: all var(--transition-fast);
+}
+
+.popup-dir-btn.active {
+  background: rgba(56, 189, 248, 0.22);
+  border-color: #38bdf8;
+  color: #38bdf8;
 }
 
 .popup-dir-btn:hover {

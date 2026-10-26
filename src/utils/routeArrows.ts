@@ -18,8 +18,30 @@ export function calculateBearing(lat1: number, lng1: number, lat2: number, lng2:
 
 /**
  * Creates a directional navigation arrow divIcon oriented along the bearing angle.
+ * Supports both single direction (arrowhead pointing forward) and bidirectional (double-ended).
  */
-export function createArrowIcon(color: string, bearing: number) {
+export function createArrowIcon(color: string, bearing: number, isBidirectional = false) {
+  if (isBidirectional) {
+    return L.divIcon({
+      className: 'route-direction-arrow-icon',
+      html: `<div style="
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transform: rotate(${Math.round(bearing)}deg);
+        pointer-events: none;
+      ">
+        <svg width="20" height="20" viewBox="0 0 24 24" style="filter: drop-shadow(0 1px 3px rgba(0,0,0,0.85)); display: block;">
+          <path d="M12 2 L17.5 7.5 L13.5 6.5 L13.5 17.5 L17.5 16.5 L12 22 L6.5 16.5 L10.5 17.5 L10.5 6.5 L6.5 7.5 Z" fill="${color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
+        </svg>
+      </div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12],
+    });
+  }
+
   return L.divIcon({
     className: 'route-direction-arrow-icon',
     html: `<div style="
@@ -43,7 +65,11 @@ export function createArrowIcon(color: string, bearing: number) {
 /**
  * Generates directional arrow markers along a polyline's segments.
  */
-export function generatePolylineArrows(layer: L.Polyline, color: string): L.Marker[] {
+export function generatePolylineArrows(
+  layer: L.Polyline,
+  color: string,
+  forceBidirectional?: boolean
+): L.Marker[] {
   const latlngs = layer.getLatLngs();
   const flat: L.LatLng[] = Array.isArray(latlngs[0])
     ? (latlngs as any).flat(Infinity)
@@ -56,6 +82,11 @@ export function generatePolylineArrows(layer: L.Polyline, color: string): L.Mark
     (layer as any).feature?.geometry?.type === 'Polygon' ||
     (layer as any).feature?.geometry?.type === 'MultiPolygon' ||
     Boolean((layer as any).pm?.getShape && (layer as any).pm.getShape().includes('Polygon'));
+
+  const isBidirectional =
+    typeof forceBidirectional === 'boolean'
+      ? forceBidirectional
+      : Boolean((layer as any).feature?.properties?.bidirectional);
 
   const segmentsCount = isPolygon ? flat.length : flat.length - 1;
   const markers: L.Marker[] = [];
@@ -79,11 +110,12 @@ export function generatePolylineArrows(layer: L.Polyline, color: string): L.Mark
       const lng = p1.lng + t * (p2.lng - p1.lng);
 
       const marker = L.marker([lat, lng], {
-        icon: createArrowIcon(color, bearing),
+        icon: createArrowIcon(color, bearing, isBidirectional),
         interactive: false,
         pmIgnore: true,
         arrowColor: color,
         arrowBearing: bearing,
+        arrowBidirectional: isBidirectional,
       } as any);
 
       markers.push(marker);

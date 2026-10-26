@@ -24,6 +24,7 @@ interface ExportArrowItem {
   pos: { x: number; y: number };
   bearing: number;
   color: string;
+  bidirectional?: boolean;
 }
 
 /**
@@ -52,6 +53,7 @@ function getMapArrows(mapContainer: HTMLElement): ExportArrowItem[] {
             pos,
             bearing: layer.options.arrowBearing,
             color: layer.options.arrowColor || '#2ebd7f',
+            bidirectional: Boolean(layer.options.arrowBidirectional),
           });
         }
       } else if (typeof layer.eachLayer === 'function') {
@@ -72,7 +74,8 @@ function getMapArrows(mapContainer: HTMLElement): ExportArrowItem[] {
           if (layer.feature?.properties?.showArrows !== false) {
             const color =
               layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
-            const markers = generatePolylineArrows(layer, color);
+            const isBidi = Boolean(layer.feature?.properties?.bidirectional);
+            const markers = generatePolylineArrows(layer, color, isBidi);
             for (const marker of markers) {
               const bearing = (marker.options as any)?.arrowBearing;
               const markerColor = (marker.options as any)?.arrowColor || color;
@@ -83,6 +86,7 @@ function getMapArrows(mapContainer: HTMLElement): ExportArrowItem[] {
                     pos,
                     bearing,
                     color: markerColor,
+                    bidirectional: isBidi,
                   });
                 }
               }
@@ -98,14 +102,15 @@ function getMapArrows(mapContainer: HTMLElement): ExportArrowItem[] {
 
 /**
  * Draws a single directional navigation arrow precisely onto the canvas
- * at the exact (x, y) coordinates with specified bearing and color.
+ * at the exact (x, y) coordinates with specified bearing, color, and optional bidirectional style.
  */
 function drawDirectionArrow(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   bearing: number,
-  color: string
+  color: string,
+  bidirectional?: boolean
 ): void {
   ctx.save();
   ctx.translate(x, y);
@@ -116,15 +121,28 @@ function drawDirectionArrow(
   ctx.shadowBlur = 3;
   ctx.shadowOffsetY = 1;
 
-  // Arrowhead path: tip pointing North/Up (0 deg)
-  // Matching createArrowIcon geometry exactly (centered at 0, 0):
-  // M 0 -9 L 7.5 3.5 L 0 0 L -7.5 3.5 Z
   ctx.beginPath();
-  ctx.moveTo(0, -9);
-  ctx.lineTo(7.5, 3.5);
-  ctx.lineTo(0, 0);
-  ctx.lineTo(-7.5, 3.5);
-  ctx.closePath();
+  if (bidirectional) {
+    // Symmetrical double-ended arrowhead centered at (0, 0)
+    ctx.moveTo(0, -10);
+    ctx.lineTo(5.5, -4.5);
+    ctx.lineTo(1.8, -5.5);
+    ctx.lineTo(1.8, 5.5);
+    ctx.lineTo(5.5, 4.5);
+    ctx.lineTo(0, 10);
+    ctx.lineTo(-5.5, 4.5);
+    ctx.lineTo(-1.8, 5.5);
+    ctx.lineTo(-1.8, -5.5);
+    ctx.lineTo(-5.5, -4.5);
+    ctx.closePath();
+  } else {
+    // Single arrowhead path: tip pointing North/Up (0 deg)
+    ctx.moveTo(0, -9);
+    ctx.lineTo(7.5, 3.5);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-7.5, 3.5);
+    ctx.closePath();
+  }
 
   ctx.fillStyle = color;
   ctx.fill();
@@ -427,7 +445,7 @@ export async function renderMapToCanvas(
   // 3. Draw Direction Arrows with exact vector coordinates (no DOM rotation offset)
   const arrows = getMapArrows(mapContainer);
   for (const arrow of arrows) {
-    drawDirectionArrow(ctx, arrow.pos.x, arrow.pos.y, arrow.bearing, arrow.color);
+    drawDirectionArrow(ctx, arrow.pos.x, arrow.pos.y, arrow.bearing, arrow.color, arrow.bidirectional);
   }
 
   // 4. Draw other non-arrow markers (e.g. search pin, waypoints) from marker pane
@@ -628,10 +646,17 @@ export function exportMapToSvg(
   let arrowsSvg = '';
   const arrows = getMapArrows(mapContainer);
   for (const arrow of arrows) {
-    arrowsSvg += `
+    if (arrow.bidirectional) {
+      arrowsSvg += `
+      <g transform="translate(${arrow.pos.x.toFixed(1)}, ${arrow.pos.y.toFixed(1)}) rotate(${arrow.bearing.toFixed(1)})">
+        <path d="M 0 -10 L 5.5 -4.5 L 1.8 -5.5 L 1.8 5.5 L 5.5 4.5 L 0 10 L -5.5 4.5 L -1.8 5.5 L -1.8 -5.5 L -5.5 -4.5 Z" fill="${arrow.color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
+      </g>`;
+    } else {
+      arrowsSvg += `
       <g transform="translate(${arrow.pos.x.toFixed(1)}, ${arrow.pos.y.toFixed(1)}) rotate(${arrow.bearing.toFixed(1)})">
         <path d="M 0 -9 L 7.5 3.5 L 0 0 L -7.5 3.5 Z" fill="${arrow.color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
       </g>`;
+    }
   }
 
   const svgDoc = `<?xml version="1.0" encoding="UTF-8"?>

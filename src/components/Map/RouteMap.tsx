@@ -20,7 +20,7 @@ import {
   type RouteCategory,
 } from '../../utils/routeColors';
 import { RouteColorsBar } from './RouteColorsBar';
-import { Map as MapIcon, Satellite, Navigation, MapPinPlus, Check } from 'lucide-react';
+import { Map as MapIcon, Satellite, Navigation, MapPinPlus, Check, ArrowUpDown } from 'lucide-react';
 import { generatePolylineArrows } from '../../utils/routeArrows';
 import { findClosestPointOnPolyline, insertVertex } from '../../utils/routeGeometry';
 
@@ -119,8 +119,17 @@ export function RouteMap({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const searchMarkerRef = useRef<L.Layer | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
-  const [showGlobalArrows, setShowGlobalArrows] = useState(true);
-  const showGlobalArrowsRef = useRef(true);
+  const [arrowMode, setArrowMode] = useState<'single' | 'both' | 'off'>(() => {
+    try {
+      const saved = localStorage.getItem('crp_global_arrow_mode');
+      if (saved === 'single' || saved === 'both' || saved === 'off') return saved;
+      const oldLegacy = localStorage.getItem('crp_show_direction_arrows');
+      return oldLegacy !== null && !JSON.parse(oldLegacy) ? 'off' : 'single';
+    } catch {
+      return 'single';
+    }
+  });
+  const arrowModeRef = useRef(arrowMode);
   const arrowLayersMapRef = useRef<Map<L.Layer, L.LayerGroup>>(new Map());
   const arrowsContainerRef = useRef<L.LayerGroup | null>(null);
 
@@ -129,8 +138,8 @@ export function RouteMap({
   const previewSnapMarkerRef = useRef<L.CircleMarker | null>(null);
 
   useEffect(() => {
-    showGlobalArrowsRef.current = showGlobalArrows;
-  }, [showGlobalArrows]);
+    arrowModeRef.current = arrowMode;
+  }, [arrowMode]);
 
   useEffect(() => {
     isAddPointModeRef.current = isAddPointMode;
@@ -239,14 +248,19 @@ export function RouteMap({
     }
 
     // Check if direction arrows are enabled globally and for this specific route
+    const currentMode = arrowModeRef.current;
+    if (currentMode === 'off') {
+      return;
+    }
     const layerArrowsEnabled = layer.feature?.properties?.showArrows !== false;
-    if (!showGlobalArrowsRef.current || !layerArrowsEnabled) {
+    if (!layerArrowsEnabled) {
       return;
     }
 
     const color =
       layer.options?.color || layer.feature?.properties?.color || DEFAULT_CATEGORY.color;
-    const arrowMarkers = generatePolylineArrows(layer, color);
+    const isBidi = currentMode === 'both' || Boolean(layer.feature?.properties?.bidirectional);
+    const arrowMarkers = generatePolylineArrows(layer, color, isBidi);
 
     if (arrowMarkers.length > 0) {
       const group = new L.LayerGroup(arrowMarkers);
@@ -324,11 +338,12 @@ export function RouteMap({
     [syncLayers, updateLayerArrows]
   );
 
-  // Toggle global arrows across all routes
-  const toggleGlobalArrows = useCallback(() => {
-    setShowGlobalArrows((prev) => {
-      const next = !prev;
-      showGlobalArrowsRef.current = next;
+  // Cycle global arrows mode: single (➔) -> both (⇆) -> off -> single (➔)
+  const cycleArrowMode = useCallback(() => {
+    setArrowMode((prev) => {
+      const next = prev === 'single' ? 'both' : prev === 'both' ? 'off' : 'single';
+      arrowModeRef.current = next;
+      localStorage.setItem('crp_global_arrow_mode', next);
 
       if (drawnItemsRef.current) {
         drawnItemsRef.current.eachLayer((layer: any) => {
@@ -390,6 +405,7 @@ export function RouteMap({
       const typeLabel = isMarker ? 'Bod' : isPolygon ? 'Polygon' : 'Úsek';
       const currentName = layer.feature?.properties?.name || '';
       const layerArrowsActive = layer.feature?.properties?.showArrows !== false;
+      const isBidirectional = Boolean(layer.feature?.properties?.bidirectional);
 
       // Calculate distance if polyline
       let distanceText = '';
@@ -444,17 +460,20 @@ export function RouteMap({
             ? `
         <div class="popup-direction-section">
           <div class="popup-direction-header">
-            <span class="popup-direction-label">Směr chůze:</span>
-            <span class="popup-direction-badge ${layerArrowsActive ? 'active' : 'inactive'}">
-              ${layerArrowsActive ? 'Šipky zapnuty' : 'Šipky skryty'}
+            <span class="popup-direction-label">Směr trasy:</span>
+            <span class="popup-direction-badge ${!layerArrowsActive ? 'inactive' : isBidirectional ? 'bidirectional' : 'active'}">
+              ${!layerArrowsActive ? 'Skryty' : isBidirectional ? 'Obousměrná ⇆' : 'Jednosměrná ➔'}
             </span>
           </div>
           <div class="popup-direction-actions">
             <button type="button" class="popup-dir-btn popup-dir-toggle-btn" title="Zapnout nebo skrýt šipky na této trase">
-              ${layerArrowsActive ? 'Skrýt šipky' : 'Zobrazit šipky'}
+              ${layerArrowsActive ? 'Skrýt' : 'Zobrazit'}
             </button>
-            <button type="button" class="popup-dir-btn popup-dir-reverse-btn" title="Obrátit směr chůze a orientaci šipek">
-              ⇄ Obrátit směr
+            <button type="button" class="popup-dir-btn popup-dir-bidi-btn ${isBidirectional ? 'active' : ''}" title="Přepnout mezi jednosměrnou a obousměrnou trasou">
+              ${isBidirectional ? '➔ 1 směr' : '⇆ Obousměrná'}
+            </button>
+            <button type="button" class="popup-dir-btn popup-dir-reverse-btn" title="Obrátit orientaci trasy a šipek">
+              ⇄ Obrátit
             </button>
           </div>
           <button type="button" class="popup-dir-btn popup-add-point-btn" style="width: 100%; margin-top: 0.35rem;" title="Aktivovat režim pro vkládání bodů do této trasy">
@@ -528,6 +547,7 @@ export function RouteMap({
 
       if (isPolyline) {
         const toggleBtn = container.querySelector('.popup-dir-toggle-btn') as HTMLButtonElement | null;
+        const bidiBtn = container.querySelector('.popup-dir-bidi-btn') as HTMLButtonElement | null;
         const reverseBtn = container.querySelector('.popup-dir-reverse-btn') as HTMLButtonElement | null;
         const dirBadge = container.querySelector('.popup-direction-badge') as HTMLElement | null;
         const addPtBtn = container.querySelector('.popup-add-point-btn') as HTMLButtonElement | null;
@@ -544,10 +564,36 @@ export function RouteMap({
             updateLayerArrows(layer);
             syncLayers();
 
-            toggleBtn.textContent = newVal ? 'Skrýt šipky' : 'Zobrazit šipky';
+            toggleBtn.textContent = newVal ? 'Skrýt' : 'Zobrazit';
             if (dirBadge) {
-              dirBadge.textContent = newVal ? 'Šipky zapnuty' : 'Šipky skryty';
-              dirBadge.className = `popup-direction-badge ${newVal ? 'active' : 'inactive'}`;
+              const bidi = Boolean(layer.feature?.properties?.bidirectional);
+              dirBadge.textContent = !newVal ? 'Skryty' : bidi ? 'Obousměrná ⇆' : 'Jednosměrná ➔';
+              dirBadge.className = `popup-direction-badge ${!newVal ? 'inactive' : bidi ? 'bidirectional' : 'active'}`;
+            }
+          });
+        }
+
+        if (bidiBtn) {
+          bidiBtn.addEventListener('click', () => {
+            const currentBidi = Boolean(layer.feature?.properties?.bidirectional);
+            const newBidi = !currentBidi;
+            layer.feature = layer.feature || { type: 'Feature', properties: {} };
+            layer.feature.properties = {
+              ...(layer.feature.properties || {}),
+              bidirectional: newBidi,
+              showArrows: true,
+            };
+            updateLayerArrows(layer);
+            syncLayers();
+
+            bidiBtn.textContent = newBidi ? '➔ 1 směr' : '⇆ Obousměrná';
+            bidiBtn.classList.toggle('active', newBidi);
+            if (dirBadge) {
+              dirBadge.textContent = newBidi ? 'Obousměrná ⇆' : 'Jednosměrná ➔';
+              dirBadge.className = `popup-direction-badge ${newBidi ? 'bidirectional' : 'active'}`;
+            }
+            if (toggleBtn) {
+              toggleBtn.textContent = 'Skrýt';
             }
           });
         }
@@ -557,7 +603,7 @@ export function RouteMap({
             reversePolylineDirection(layer);
             reverseBtn.textContent = 'Obráceno ✓';
             setTimeout(() => {
-              if (reverseBtn) reverseBtn.textContent = '⇄ Obrátit směr';
+              if (reverseBtn) reverseBtn.textContent = '⇄ Obrátit';
             }, 1000);
           });
         }
@@ -1146,23 +1192,33 @@ export function RouteMap({
           </div>
         </div>
 
-        {/* Direction Arrows Toggle */}
+        {/* Direction Arrows Toggle: Single -> Both -> Off */}
         <div className="left-tool-item">
           <button
             type="button"
-            className={`left-tool-btn ${showGlobalArrows ? 'is-active' : ''}`}
-            onClick={toggleGlobalArrows}
+            className={`left-tool-btn ${arrowMode !== 'off' ? 'is-active' : ''}`}
+            onClick={cycleArrowMode}
             title={
-              showGlobalArrows
-                ? 'Směrové šipky: Zapnuty — Kliknutím je skryjete na celé mapě'
-                : 'Směrové šipky: Vypnuty — Kliknutím je zobrazíte'
+              arrowMode === 'single'
+                ? 'Šipky: Jednosměrné (➔) — Klikněte pro přepnutí na Obousměrné'
+                : arrowMode === 'both'
+                  ? 'Šipky: Obousměrné (⇆) — Klikněte pro skrytí'
+                  : 'Šipky: Vypnuty — Klikněte pro zapnutí'
             }
             aria-label="Přepnout směrové šipky na trasách"
           >
-            <Navigation size={17} />
+            {arrowMode === 'both' ? (
+              <ArrowUpDown size={17} />
+            ) : (
+              <Navigation size={17} />
+            )}
           </button>
           <div className="left-tool-tooltip">
-            {showGlobalArrows ? 'Šipky směru: Zapnuty' : 'Šipky směru: Vypnuty'}
+            {arrowMode === 'single'
+              ? 'Šipky: Jednosměrné (➔)'
+              : arrowMode === 'both'
+                ? 'Šipky: Obousměrné (⇆)'
+                : 'Šipky: Vypnuty'}
           </div>
         </div>
 
