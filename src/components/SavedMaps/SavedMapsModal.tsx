@@ -89,8 +89,7 @@ export function SavedMapsModal({
         <div className="modal-header">
           <div className="modal-title-wrap">
             <Map size={18} className="modal-title-icon" />
-            <h2 className="modal-title">Uložené mapy v mezipaměti</h2>
-            <span className="modal-count-badge">{maps.length}</span>
+            <h2 className="modal-title">Uložené mapy ({maps.length})</h2>
           </div>
 
           <div className="modal-header-actions">
@@ -196,17 +195,18 @@ export function SavedMapsModal({
                       </>
                     )}
 
-                    {isActive && <span className="active-pill">Aktivní</span>}
+                    {isActive && <span className="active-indicator">Aktivní</span>}
                   </div>
 
                   {/* Metadata and Stats */}
                   <div className="map-card-meta">
                     <span className="meta-time">Upraveno: {formatDate(map.updatedAt)}</span>
-                    <div className="meta-badges">
-                      <span className="meta-badge">{map.stats.totalDistanceKm} km</span>
-                      <span className="meta-badge">{map.stats.lineCount} úseků</span>
-                      <span className="meta-badge">{map.stats.markerCount} bodů</span>
-                    </div>
+                    <span className="meta-sep">•</span>
+                    <span>{map.stats.totalDistanceKm} km</span>
+                    <span className="meta-sep">•</span>
+                    <span>{map.stats.lineCount} úseků</span>
+                    <span className="meta-sep">•</span>
+                    <span>{map.stats.markerCount} bodů</span>
                   </div>
                 </div>
 

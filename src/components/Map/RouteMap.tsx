@@ -429,7 +429,7 @@ export function RouteMap({
 
       container.innerHTML = `
         <div class="popup-top-row">
-          <span class="popup-role-pill" style="border-color:${currentCat.color}; color:${currentCat.color};">
+          <span class="popup-role-pill" style="color:${currentCat.color};">
             <span class="popup-dot" style="background-color: ${currentCat.color};"></span>
             ${currentCat.name}
           </span>

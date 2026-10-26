@@ -302,8 +302,6 @@ export default function App() {
   return (
     <div className="app-container">
       <Navbar
-        stats={stats}
-        activeMapName={activeMap?.name || 'Výchozí trasa'}
         savedMapsCount={savedMaps.length}
         onOpenMapsModal={() => setIsMapsModalOpen(true)}
         onOpenInfoModal={() => setIsInfoModalOpen(true)}

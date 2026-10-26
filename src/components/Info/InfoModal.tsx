@@ -29,7 +29,6 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
             <h2 id="info-modal-title" className="modal-title">
               O aplikaci CRP — Complex Route Planning App
             </h2>
-            <span className="modal-badge-pill">Lokální nástroj</span>
           </div>
           <button
             type="button"
@@ -45,11 +44,9 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
         {/* Modal Content */}
         <div className="info-modal-body">
           {/* Section 1: Privacy & Local Cache */}
-          <div className="info-card highlight-card">
+          <div className="info-card">
             <div className="info-card-header">
-              <div className="info-icon-badge security">
-                <ShieldCheck size={18} />
-              </div>
+              <ShieldCheck size={20} className="info-card-icon" />
               <div>
                 <h3 className="info-card-title">100% Lokální úložiště & Soukromí</h3>
                 <span className="info-card-subtitle">Žádné servery, žádné databáze, žádné sledování</span>
@@ -78,9 +75,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
           {/* Section 2: Creator & Origin Story */}
           <div className="info-card">
             <div className="info-card-header">
-              <div className="info-icon-badge author">
-                <User size={18} />
-              </div>
+              <User size={20} className="info-card-icon" />
               <div>
                 <h3 className="info-card-title">Kdo aplikaci vytvořil a proč</h3>
                 <span className="info-card-subtitle">Příběh vzniku a účel projektu</span>
@@ -112,9 +107,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
           {/* Section 3: Technical Highlights */}
           <div className="info-card">
             <div className="info-card-header">
-              <div className="info-icon-badge tech">
-                <GitFork size={18} />
-              </div>
+              <GitFork size={20} className="info-card-icon" />
               <div>
                 <h3 className="info-card-title">Technologické řešení & Funkce</h3>
                 <span className="info-card-subtitle">Moderní webový stack</span>

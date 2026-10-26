@@ -1,10 +1,8 @@
 import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen, Info } from 'lucide-react';
-import type { RouteStats, SearchLocation } from '../../types/route';
+import type { SearchLocation } from '../../types/route';
 import { SearchBar } from '../Search/SearchBar';
 
 interface NavbarProps {
-  stats: RouteStats;
-  activeMapName: string;
   savedMapsCount: number;
   onOpenMapsModal: () => void;
   onOpenInfoModal: () => void;
@@ -15,8 +13,6 @@ interface NavbarProps {
 }
 
 export function Navbar({
-  stats,
-  activeMapName,
   savedMapsCount,
   onOpenMapsModal,
   onOpenInfoModal,
@@ -43,27 +39,6 @@ export function Navbar({
 
       <div className="navbar-center">
         <SearchBar onSelectLocation={onSelectLocation} />
-
-        <div className="navbar-metrics">
-          <div className="metric-item">
-            <span className="metric-label">Vzdálenost</span>
-            <span className="metric-value">{stats.totalDistanceKm} km</span>
-          </div>
-          <div className="metric-divider" />
-          <div className="metric-item">
-            <span className="metric-label">Úseky</span>
-            <span className="metric-value">{stats.lineCount}</span>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          className="storage-status clickable"
-          onClick={onOpenMapsModal}
-          title="Kliknutím otevřít správu uložených map"
-        >
-          <span className="status-map-name">{activeMapName}</span>
-        </button>
       </div>
 
       <div className="navbar-actions">
@@ -80,13 +55,13 @@ export function Navbar({
 
         <button
           type="button"
-          className="btn-action secondary info-btn"
-          onClick={onOpenInfoModal}
-          title="O aplikaci, autorovi a lokálním ukládání"
-          id="btn-info-modal"
+          className="btn-action secondary"
+          onClick={onImportClick}
+          title="Importovat GeoJSON"
+          id="btn-import-geojson"
         >
-          <Info size={14} />
-          <span>Info</span>
+          <FolderUp size={14} />
+          <span>Import</span>
         </button>
 
         <button
@@ -102,13 +77,13 @@ export function Navbar({
 
         <button
           type="button"
-          className="btn-action secondary"
-          onClick={onImportClick}
-          title="Importovat GeoJSON"
-          id="btn-import-geojson"
+          className="btn-action secondary btn-icon-only info-btn"
+          onClick={onOpenInfoModal}
+          title="O aplikaci, autorovi a lokálním ukládání"
+          aria-label="Informace o aplikaci"
+          id="btn-info-modal"
         >
-          <FolderUp size={14} />
-          <span>Import</span>
+          <Info size={15} />
         </button>
 
         <button

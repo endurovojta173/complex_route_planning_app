@@ -125,10 +125,7 @@ export function ExportModal({
                 <FileText size={22} />
               </div>
               <div className="export-card-info">
-                <div className="export-card-title-row">
-                  <h3 className="export-card-title">PDF dokument (.pdf)</h3>
-                  <span className="export-badge recommended">Doporučeno</span>
-                </div>
+                <h3 className="export-card-title">PDF dokument (.pdf)</h3>
                 <p className="export-card-desc">
                   Kompletní tisková mapa s aktuálním výřezem, trasou, měřítkem a statistikami.
                 </p>
