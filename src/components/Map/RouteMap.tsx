@@ -20,8 +20,9 @@ import {
   type RouteCategory,
 } from '../../utils/routeColors';
 import { RouteColorsBar } from './RouteColorsBar';
-import { Map as MapIcon, Satellite, Navigation } from 'lucide-react';
+import { Map as MapIcon, Satellite, Navigation, MapPinPlus, Check } from 'lucide-react';
 import { generatePolylineArrows } from '../../utils/routeArrows';
+import { findClosestPointOnPolyline, insertVertex } from '../../utils/routeGeometry';
 
 // Fix Leaflet default marker icons for bundlers
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
@@ -117,9 +118,17 @@ export function RouteMap({
   const arrowLayersMapRef = useRef<Map<L.Layer, L.LayerGroup>>(new Map());
   const arrowsContainerRef = useRef<L.LayerGroup | null>(null);
 
+  const [isAddPointMode, setIsAddPointMode] = useState(false);
+  const isAddPointModeRef = useRef(false);
+  const previewSnapMarkerRef = useRef<L.CircleMarker | null>(null);
+
   useEffect(() => {
     showGlobalArrowsRef.current = showGlobalArrows;
   }, [showGlobalArrows]);
+
+  useEffect(() => {
+    isAddPointModeRef.current = isAddPointMode;
+  }, [isAddPointMode]);
 
   const categoriesRef = useRef(categories);
   const onStatsChangeRef = useRef(onStatsChange);
@@ -263,6 +272,50 @@ export function RouteMap({
     [updateLayerArrows, syncLayers]
   );
 
+  // Insert a new vertex into a polyline and refresh its graphics & storage
+  const handleInsertPointIntoPolyline = useCallback(
+    (polyline: L.Polyline, latlng: L.LatLng) => {
+      const map = mapInstanceRef.current;
+      if (!map) return;
+
+      const result = insertVertex(map, polyline, latlng);
+      if (!result) return;
+
+      // Update Geoman edit mode if active on this layer so vertices update
+      if ((polyline as any).pm?.enabled?.()) {
+        (polyline as any).pm.disable();
+        (polyline as any).pm.enable();
+      } else {
+        (polyline as any).pm?.enable({
+          allowSelfIntersection: true,
+          snappable: true,
+          snapDistance: 20,
+        });
+      }
+
+      updateLayerArrows(polyline);
+      syncLayers();
+
+      // Show temporary pulse animation marker at inserted point
+      const pulse = L.circleMarker(result.insertedLatLng, {
+        radius: 8,
+        color: '#ffffff',
+        weight: 3,
+        fillColor: (polyline.options as any).color || '#5fe08d',
+        fillOpacity: 0.95,
+        interactive: false,
+        pmIgnore: true,
+      }).addTo(map);
+
+      setTimeout(() => {
+        if (map.hasLayer(pulse)) {
+          map.removeLayer(pulse);
+        }
+      }, 900);
+    },
+    [syncLayers, updateLayerArrows]
+  );
+
   // Toggle global arrows across all routes
   const toggleGlobalArrows = useCallback(() => {
     setShowGlobalArrows((prev) => {
@@ -396,6 +449,9 @@ export function RouteMap({
               ⇄ Obrátit směr
             </button>
           </div>
+          <button type="button" class="popup-dir-btn popup-add-point-btn" style="width: 100%; margin-top: 0.35rem;" title="Aktivovat režim pro vkládání bodů do této trasy">
+            ➕ Přidat bod do trasy
+          </button>
         </div>
         `
             : ''
@@ -466,6 +522,7 @@ export function RouteMap({
         const toggleBtn = container.querySelector('.popup-dir-toggle-btn') as HTMLButtonElement | null;
         const reverseBtn = container.querySelector('.popup-dir-reverse-btn') as HTMLButtonElement | null;
         const dirBadge = container.querySelector('.popup-direction-badge') as HTMLElement | null;
+        const addPtBtn = container.querySelector('.popup-add-point-btn') as HTMLButtonElement | null;
 
         if (toggleBtn) {
           toggleBtn.addEventListener('click', () => {
@@ -494,6 +551,13 @@ export function RouteMap({
             setTimeout(() => {
               if (reverseBtn) reverseBtn.textContent = '⇄ Obrátit směr';
             }, 1000);
+          });
+        }
+
+        if (addPtBtn) {
+          addPtBtn.addEventListener('click', () => {
+            layer.closePopup();
+            setIsAddPointMode(true);
           });
         }
       }
@@ -525,6 +589,13 @@ export function RouteMap({
 
   const bindLayerEvents = useCallback(
     function attachEvents(layer: L.Layer) {
+      layer.on('click', (e: any) => {
+        if (isAddPointModeRef.current && isPolylineLayer(layer)) {
+          L.DomEvent.stopPropagation(e);
+          handleInsertPointIntoPolyline(layer as L.Polyline, e.latlng);
+          return;
+        }
+      });
       layer.on('pm:edit', () => {
         updateLayerArrows(layer);
         syncLayers();
@@ -560,7 +631,7 @@ export function RouteMap({
         maxWidth: 290,
       });
     },
-    [syncLayers, createLayerPopupContent, updateLayerArrows]
+    [syncLayers, createLayerPopupContent, updateLayerArrows, handleInsertPointIntoPolyline]
   );
 
   const initialTileProviderRef = useRef(tileProviderId);
@@ -733,6 +804,81 @@ export function RouteMap({
       }
     }
 
+    const handleMapMouseMove = (e: L.LeafletMouseEvent) => {
+      if (!isAddPointModeRef.current || !drawnItemsRef.current) {
+        if (previewSnapMarkerRef.current && map.hasLayer(previewSnapMarkerRef.current)) {
+          map.removeLayer(previewSnapMarkerRef.current);
+          previewSnapMarkerRef.current = null;
+        }
+        return;
+      }
+
+      let closestPolyline: L.Polyline | null = null;
+      let minDistance = 35;
+      let snappedPt: L.LatLng | null = null;
+      let polylineColor = '#5fe08d';
+
+      drawnItemsRef.current.eachLayer((layer: any) => {
+        if (isPolylineLayer(layer)) {
+          const match = findClosestPointOnPolyline(map, layer, e.latlng);
+          if (match && match.distancePx < minDistance) {
+            minDistance = match.distancePx;
+            closestPolyline = layer;
+            snappedPt = match.snappedLatLng;
+            polylineColor = layer.options?.color || layer.feature?.properties?.color || '#5fe08d';
+          }
+        }
+      });
+
+      if (closestPolyline && snappedPt) {
+        if (!previewSnapMarkerRef.current) {
+          previewSnapMarkerRef.current = L.circleMarker(snappedPt, {
+            radius: 6,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: polylineColor,
+            fillOpacity: 0.9,
+            interactive: false,
+            pmIgnore: true,
+            className: 'preview-snap-point-marker',
+          }).addTo(map);
+        } else {
+          previewSnapMarkerRef.current.setLatLng(snappedPt);
+          previewSnapMarkerRef.current.setStyle({
+            fillColor: polylineColor,
+          });
+        }
+      } else if (previewSnapMarkerRef.current && map.hasLayer(previewSnapMarkerRef.current)) {
+        map.removeLayer(previewSnapMarkerRef.current);
+        previewSnapMarkerRef.current = null;
+      }
+    };
+
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      if (!isAddPointModeRef.current || !drawnItemsRef.current) return;
+
+      let closestPolyline: L.Polyline | null = null;
+      let minDistance = 35;
+
+      drawnItemsRef.current.eachLayer((layer: any) => {
+        if (isPolylineLayer(layer)) {
+          const match = findClosestPointOnPolyline(map, layer, e.latlng);
+          if (match && match.distancePx < minDistance) {
+            minDistance = match.distancePx;
+            closestPolyline = layer;
+          }
+        }
+      });
+
+      if (closestPolyline) {
+        L.DomEvent.stopPropagation(e);
+        handleInsertPointIntoPolyline(closestPolyline, e.latlng);
+      }
+    };
+
+    map.on('mousemove', handleMapMouseMove);
+    map.on('click', handleMapClick);
+
     syncLayers();
 
     mapInstanceRef.current = map;
@@ -740,6 +886,12 @@ export function RouteMap({
 
     // Cleanup Leaflet and Geoman instances on unmount to prevent leaks and re-render glitches
     return () => {
+      map.off('mousemove', handleMapMouseMove);
+      map.off('click', handleMapClick);
+      if (previewSnapMarkerRef.current && map.hasLayer(previewSnapMarkerRef.current)) {
+        map.removeLayer(previewSnapMarkerRef.current);
+        previewSnapMarkerRef.current = null;
+      }
       map.pm.removeControls();
       map.off();
       drawnItems.clearLayers();
@@ -751,7 +903,33 @@ export function RouteMap({
       arrowsContainerRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [bindLayerEvents, syncLayers, updateLayerArrows]);
+  }, [bindLayerEvents, syncLayers, updateLayerArrows, handleInsertPointIntoPolyline]);
+
+  // Toggle cursor style and Geoman draw when entering/exiting add-point mode
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    if (isAddPointMode) {
+      mapContainerRef.current.classList.add('cursor-crosshair');
+      mapInstanceRef.current?.pm.disableDraw();
+    } else {
+      mapContainerRef.current.classList.remove('cursor-crosshair');
+      if (previewSnapMarkerRef.current && mapInstanceRef.current?.hasLayer(previewSnapMarkerRef.current)) {
+        mapInstanceRef.current.removeLayer(previewSnapMarkerRef.current);
+        previewSnapMarkerRef.current = null;
+      }
+    }
+  }, [isAddPointMode]);
+
+  // Support Escape key to exit add point mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isAddPointModeRef.current) {
+        setIsAddPointMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Update Geoman path drawing styles whenever activeCategory changes
   useEffect(() => {
@@ -967,6 +1145,53 @@ export function RouteMap({
           {showGlobalArrows ? 'Skrýt šipky směru' : 'Zobrazit šipky směru'}
         </div>
       </div>
+
+      {/* Floating Add Point into Route Tool Button (Placed right below arrows toggle) */}
+      <div className="add-point-floating-toggle-container">
+        <button
+          type="button"
+          className={`add-point-toggle-btn ${isAddPointMode ? 'is-active' : 'is-inactive'}`}
+          onClick={() => setIsAddPointMode((prev) => !prev)}
+          title={
+            isAddPointMode
+              ? 'Režim vkládání bodů je aktivní — Kliknutím ukončíte'
+              : 'Nástroj: Přidat bod do existující trasy'
+          }
+          aria-label="Nástroj přidat bod do trasy"
+        >
+          <div className="add-point-icon-wrapper">
+            <MapPinPlus size={18} />
+          </div>
+          <span className="add-point-btn-label">
+            {isAddPointMode ? 'Aktivní' : '+ Bod'}
+          </span>
+          <div className={`add-point-indicator-dot ${isAddPointMode ? 'is-active' : ''}`} />
+        </button>
+        <div className="add-point-tooltip">
+          {isAddPointMode ? 'Ukončit vkládání bodů' : 'Přidat bod do trasy'}
+        </div>
+      </div>
+
+      {/* Floating Top Banner when Add Point Mode is Active */}
+      {isAddPointMode && (
+        <div className="add-point-floating-banner">
+          <div className="add-point-banner-content">
+            <span className="add-point-banner-dot" />
+            <span className="add-point-banner-text">
+              <strong>Nástroj: Přidat bod</strong> — Klikněte kamkoliv na trasu pro vložení nového bodu
+            </span>
+          </div>
+          <button
+            type="button"
+            className="add-point-banner-close-btn"
+            onClick={() => setIsAddPointMode(false)}
+            title="Ukončit vkládání bodů (Esc)"
+          >
+            <Check size={14} />
+            <span>Hotovo</span>
+          </button>
+        </div>
+      )}
 
       {!isMapReady && (
         <div className="map-loader-backdrop">

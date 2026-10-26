@@ -62,3 +62,9 @@ The application includes a multi-stage `Dockerfile` and `docker-compose.yml` sup
 - Use modern functional components and React hooks.
 - Ensure proper cleanup of map instances (Leaflet) and drawing tools (Geoman) inside `useEffect` to prevent memory leaks and duplication of overlay layers during re-renders.
 - **Base URL Setting:** In `vite.config.ts`, `base` is configured to use `process.env.BASE_PATH` or fallback to `/complex_route_planning_app/` if `GITHUB_ACTIONS` is set, and `'/'` for Docker or standard local dev.
+
+## Testing Rules
+- Do NOT use the `browser_subagent` (browser clicking agent) automatically.
+- Perform code validation strictly using the linter (`oxlint`) and TypeScript build (`tsc -b && vite build`).
+- Only launch the browser agent if the user explicitly requests it in their message.
+

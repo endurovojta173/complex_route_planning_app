@@ -120,3 +120,11 @@ If you already have Node.js (v20+) and npm installed and prefer running natively
 ## 🌐 GitHub Pages Deployment
 
 A GitHub Actions workflow is provided in `.github/workflows/deploy.yml`. When pushing to `main` or `master`, the workflow automatically builds and deploys the static application to GitHub Pages.
+
+---
+
+## 🤖 Testing Rules (AI Agents)
+- Do not use the `browser_subagent` tool automatically.
+- Perform validation only using the linter (`oxlint`) and the TypeScript build (`tsc -b && vite build`).
+- Launch the browser ONLY if the user explicitly asks you to do so in a message.
+

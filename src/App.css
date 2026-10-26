@@ -2205,5 +2205,199 @@
   transform: scale(0.98);
 }
 
+/* Floating Add Point Tool Button */
+.add-point-floating-toggle-container {
+  position: absolute;
+  top: 389px;
+  left: 10px;
+  z-index: 1002;
+  display: flex;
+  align-items: center;
+}
+
+.add-point-toggle-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 46px;
+  height: 50px;
+  background: rgba(6, 37, 33, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: all var(--transition-fast);
+  padding: 4px 2px;
+}
+
+.add-point-toggle-btn:hover {
+  background: #0f3731;
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 10px rgba(95, 224, 141, 0.25);
+}
+
+.add-point-toggle-btn:active {
+  transform: translateY(0);
+}
+
+.add-point-toggle-btn.is-active {
+  border-color: var(--accent-primary);
+  background: #0d3832;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 10px rgba(95, 224, 141, 0.35);
+}
+
+.add-point-toggle-btn.is-inactive {
+  opacity: 0.85;
+}
+
+.add-point-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  transition: transform var(--transition-fast);
+}
+
+.add-point-toggle-btn:hover .add-point-icon-wrapper {
+  transform: scale(1.1);
+}
+
+.add-point-btn-label {
+  font-size: 7px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  line-height: 1;
+  color: var(--text-primary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.add-point-indicator-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: all var(--transition-fast);
+}
+
+.add-point-indicator-dot.is-active {
+  background: var(--accent-primary);
+  box-shadow: 0 0 5px rgba(95, 224, 141, 0.8);
+}
+
+/* Tooltip on hover */
+.add-point-tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: #062521;
+  border: 1px solid var(--border-accent);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.65);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1005;
+}
+
+.add-point-floating-toggle-container:hover .add-point-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* Floating Top Banner when Add Point Mode is Active */
+.add-point-floating-banner {
+  position: absolute;
+  top: 66px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1005;
+  background: rgba(6, 37, 33, 0.96);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--accent-primary);
+  border-radius: 20px;
+  padding: 0.4rem 0.6rem 0.4rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 0 14px rgba(95, 224, 141, 0.25);
+  pointer-events: auto;
+}
+
+.add-point-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.add-point-banner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: 0 0 8px rgba(95, 224, 141, 0.9);
+}
+
+.add-point-banner-text {
+  font-size: 0.78rem;
+  color: #ffffff;
+  letter-spacing: 0.01em;
+}
+
+.add-point-banner-text strong {
+  color: var(--accent-primary);
+}
+
+.add-point-banner-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: #13433d;
+  border: 1px solid var(--border-accent);
+  color: #ffffff;
+  padding: 0.3rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.add-point-banner-close-btn:hover {
+  background: #18524a;
+  border-color: var(--accent-primary);
+}
+
+.cursor-crosshair,
+.cursor-crosshair .leaflet-container-view,
+.cursor-crosshair .leaflet-interactive {
+  cursor: crosshair !important;
+}
+
+.preview-snap-point-marker {
+  pointer-events: none !important;
+}
+
+
 
 
