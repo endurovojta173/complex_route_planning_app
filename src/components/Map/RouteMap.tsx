@@ -655,6 +655,7 @@ export function RouteMap({
     const tileLayer = L.tileLayer(initialProvider.url, {
       attribution: initialProvider.attribution,
       maxZoom: initialProvider.maxZoom,
+      crossOrigin: true,
     }).addTo(map);
     tileLayerRef.current = tileLayer;
 
@@ -956,6 +957,7 @@ export function RouteMap({
     const newLayer = L.tileLayer(provider.url, {
       attribution: provider.attribution,
       maxZoom: provider.maxZoom,
+      crossOrigin: true,
     }).addTo(mapInstanceRef.current);
 
     tileLayerRef.current = newLayer;

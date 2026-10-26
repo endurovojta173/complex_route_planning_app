@@ -113,13 +113,13 @@ export function Navbar({
 
         <button
           type="button"
-          className="btn-action danger"
+          className="btn-action danger btn-icon-only"
           onClick={onClearClick}
           title="Vymazat vše z mapy"
+          aria-label="Vymazat vše z mapy"
           id="btn-clear-map"
         >
-          <Trash2 size={14} />
-          <span>Smazat</span>
+          <Trash2 size={15} />
         </button>
       </div>
     </header>

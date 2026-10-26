@@ -5,6 +5,7 @@ import { Navbar } from './components/Header/Navbar';
 import { ControlPanel } from './components/Sidebar/ControlPanel';
 import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
 import { InfoModal } from './components/Info/InfoModal';
+import { ExportModal } from './components/Modals/ExportModal';
 import type { RouteStats, TileProviderId, SearchLocation, SavedMapItem } from './types/route';
 import {
   DEFAULT_CATEGORY,
@@ -31,6 +32,7 @@ export default function App() {
   const [activeMapId, setActiveMapIdState] = useState<string>(() => getActiveMapId());
   const [isMapsModalOpen, setIsMapsModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<RouteCategory>(() => getSavedCategories()[0] || DEFAULT_CATEGORY);
 
   const activeMap = savedMaps.find((m) => m.id === activeMapId) || savedMaps[0];
@@ -256,7 +258,7 @@ export default function App() {
         savedMapsCount={savedMaps.length}
         onOpenMapsModal={() => setIsMapsModalOpen(true)}
         onOpenInfoModal={() => setIsInfoModalOpen(true)}
-        onExport={handleExport}
+        onExport={() => setIsExportModalOpen(true)}
         onImportClick={handleImportClick}
         onClearClick={handleClear}
         onSelectLocation={handleSelectLocation}
@@ -297,6 +299,17 @@ export default function App() {
       <InfoModal
         isOpen={isInfoModalOpen}
         onClose={() => setIsInfoModalOpen(false)}
+      />
+
+      {/* Export Options Modal (PDF, SVG, GeoJSON) */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        activeMapName={activeMap?.name || 'Výchozí trasa'}
+        stats={stats}
+        categories={categories}
+        onExportGeoJson={handleExport}
+        onShowNotification={showNotification}
       />
 
       {/* Hidden file input for GeoJSON import */}
