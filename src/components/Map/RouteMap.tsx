@@ -20,6 +20,7 @@ import {
   type RouteCategory,
 } from '../../utils/routeColors';
 import { RouteColorsBar } from './RouteColorsBar';
+import { Map, Satellite } from 'lucide-react';
 
 // Fix Leaflet default marker icons for bundlers
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
@@ -60,6 +61,7 @@ function createColoredMarkerIcon(color: string) {
 
 interface RouteMapProps {
   tileProviderId: TileProviderId;
+  onTileSelect: (id: TileProviderId) => void;
   onStatsChange: (stats: RouteStats) => void;
   onGeoJsonChange?: (geoJson: FeatureCollection) => void;
   importGeoJsonData: FeatureCollection | null;
@@ -73,6 +75,7 @@ interface RouteMapProps {
 
 export function RouteMap({
   tileProviderId,
+  onTileSelect,
   onStatsChange,
   onGeoJsonChange,
   importGeoJsonData,
@@ -597,6 +600,32 @@ export function RouteMap({
         onSelectCategory={onActiveCategoryChange}
         onRenameCategory={onRenameCategory}
       />
+
+      {/* Floating Basemap Toggle Button (Placed to the left beside the panel) */}
+      <div className="basemap-floating-toggle-container">
+        <button
+          type="button"
+          className={`basemap-toggle-btn ${tileProviderId === 'satellite' ? 'is-satellite' : 'is-osm'}`}
+          onClick={() => onTileSelect(tileProviderId === 'satellite' ? 'osm' : 'satellite')}
+          title={
+            tileProviderId === 'satellite'
+              ? 'Aktivní: Esri Satelit — Kliknutím přepnete na Standardní mapu'
+              : 'Aktivní: Standardní mapa — Kliknutím přepnete na Satelit'
+          }
+          aria-label="Přepnout mapový podklad"
+        >
+          <div className="basemap-icon-wrapper">
+            {tileProviderId === 'satellite' ? <Satellite size={18} /> : <Map size={18} />}
+          </div>
+          <span className="basemap-label">
+            {tileProviderId === 'satellite' ? 'Satelit' : 'Standard'}
+          </span>
+          <div className="basemap-indicator-dot" />
+        </button>
+        <div className="basemap-tooltip">
+          {tileProviderId === 'satellite' ? 'Přepnout na Standard' : 'Přepnout na Satelit'}
+        </div>
+      </div>
 
       {!isMapReady && (
         <div className="map-loader-backdrop">

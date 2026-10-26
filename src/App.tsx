@@ -265,8 +265,6 @@ export default function App() {
       <main className="main-content">
         <ControlPanel
           stats={stats}
-          currentTileId={currentTileId}
-          onTileSelect={setCurrentTileId}
           activeCategory={activeCategory}
           onSelectCategory={setActiveCategory}
           categories={categories}
@@ -275,6 +273,7 @@ export default function App() {
 
         <RouteMap
           tileProviderId={currentTileId}
+          onTileSelect={setCurrentTileId}
           onStatsChange={setStats}
           onGeoJsonChange={handleGeoJsonChange}
           importGeoJsonData={importedGeoJson}

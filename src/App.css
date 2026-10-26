@@ -1781,3 +1781,122 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Floating Basemap Toggle Button (Placed to the left beside the panel) */
+.basemap-floating-toggle-container {
+  position: absolute;
+  top: 280px;
+  left: 10px;
+  z-index: 998;
+  display: flex;
+  align-items: center;
+}
+
+.basemap-toggle-btn {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  width: 44px;
+  height: 52px;
+  background: rgba(6, 37, 33, 0.95);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  transition: all var(--transition-fast);
+  padding: 4px 2px;
+}
+
+.basemap-toggle-btn:hover {
+  background: #0f3731;
+  color: #ffffff;
+  border-color: var(--accent-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55), 0 0 10px rgba(95, 224, 141, 0.25);
+}
+
+.basemap-toggle-btn:active {
+  transform: translateY(0);
+}
+
+.basemap-toggle-btn.is-satellite {
+  border-color: var(--accent-primary);
+  background: #0d3832;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 8px rgba(95, 224, 141, 0.2);
+}
+
+.basemap-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-primary);
+  transition: transform var(--transition-fast);
+}
+
+.basemap-toggle-btn:hover .basemap-icon-wrapper {
+  transform: scale(1.1);
+}
+
+.basemap-label {
+  font-size: 7.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  color: var(--text-primary);
+  text-align: center;
+  max-width: 40px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.basemap-indicator-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent-primary);
+  box-shadow: 0 0 5px rgba(95, 224, 141, 0.8);
+}
+
+.basemap-toggle-btn.is-satellite .basemap-indicator-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 5px rgba(56, 189, 248, 0.8);
+}
+
+/* Tooltip on hover */
+.basemap-tooltip {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: #062521;
+  border: 1px solid var(--border-accent);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 1001;
+}
+
+.basemap-floating-toggle-container:hover .basemap-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+

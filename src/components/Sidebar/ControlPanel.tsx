@@ -12,13 +12,10 @@ import {
   Pencil,
   X,
 } from 'lucide-react';
-import type { RouteStats, TileProviderId, RouteCategory } from '../../types/route';
-import { TILE_PROVIDERS } from '../../utils/tileProviders';
+import type { RouteStats, RouteCategory } from '../../types/route';
 
 interface ControlPanelProps {
   stats: RouteStats;
-  currentTileId: TileProviderId;
-  onTileSelect: (id: TileProviderId) => void;
   activeCategory: RouteCategory;
   onSelectCategory: (category: RouteCategory) => void;
   categories: RouteCategory[];
@@ -27,8 +24,6 @@ interface ControlPanelProps {
 
 export function ControlPanel({
   stats,
-  currentTileId,
-  onTileSelect,
   activeCategory,
   onSelectCategory,
   categories,
@@ -228,27 +223,6 @@ export function ControlPanel({
                 </div>
               );
             })}
-          </div>
-        </div>
-
-        {/* Section: Basemap Selection */}
-        <div className="panel-section">
-          <div className="section-title">
-            <Layers size={16} className="title-icon" />
-            <span>Mapové podklady</span>
-          </div>
-          <div className="tiles-selector">
-            {TILE_PROVIDERS.map((provider) => (
-              <button
-                key={provider.id}
-                type="button"
-                className={`tile-btn ${currentTileId === provider.id ? 'active' : ''}`}
-                onClick={() => onTileSelect(provider.id)}
-              >
-                <span className="tile-indicator" />
-                <span className="tile-name">{provider.name}</span>
-              </button>
-            ))}
           </div>
         </div>
       </div>
