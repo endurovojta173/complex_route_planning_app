@@ -91,6 +91,9 @@ interface RouteMapProps {
   activeCategory: RouteCategory;
   onActiveCategoryChange: (cat: RouteCategory) => void;
   categories: RouteCategory[];
+  activeCategoryIds: string[];
+  onAddCategory: (id: string) => void;
+  onRemoveCategory: (id: string) => void;
   onRenameCategory: (id: string, newName: string) => void;
 }
 
@@ -105,6 +108,9 @@ export function RouteMap({
   activeCategory,
   onActiveCategoryChange,
   categories,
+  activeCategoryIds,
+  onAddCategory,
+  onRemoveCategory,
   onRenameCategory,
 }: RouteMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
@@ -134,13 +140,15 @@ export function RouteMap({
   const onStatsChangeRef = useRef(onStatsChange);
   const onGeoJsonChangeRef = useRef(onGeoJsonChange);
   const activeCategoryRef = useRef(activeCategory);
+  const onAddCategoryRef = useRef(onAddCategory);
 
   useEffect(() => {
     categoriesRef.current = categories;
     onStatsChangeRef.current = onStatsChange;
     onGeoJsonChangeRef.current = onGeoJsonChange;
     activeCategoryRef.current = activeCategory;
-  }, [categories, onStatsChange, onGeoJsonChange, activeCategory]);
+    onAddCategoryRef.current = onAddCategory;
+  }, [categories, onStatsChange, onGeoJsonChange, activeCategory, onAddCategory]);
 
   // Synchronize drawn layers to localStorage and notify parent
   const syncLayers = useCallback(() => {
@@ -218,10 +226,10 @@ export function RouteMap({
     }
   }, []);
 
-  // Update or regenerate directional arrows for a polyline layer
+  // Update or regenerate directional arrows for a polyline or polygon layer
   const updateLayerArrows = useCallback((layer: any) => {
     if (!arrowsContainerRef.current) return;
-    if (!isPolylineLayer(layer)) return;
+    if (!layer || typeof layer.getLatLngs !== 'function') return;
 
     // Remove previous arrow markers for this layer if any
     const existingGroup = arrowLayersMapRef.current.get(layer);
@@ -576,6 +584,7 @@ export function RouteMap({
           `;
           btn.addEventListener('click', () => {
             updateLayerCategory(layer, cat);
+            onAddCategoryRef.current?.(cat.id);
             layer.closePopup();
           });
           grid.appendChild(btn);
@@ -667,6 +676,9 @@ export function RouteMap({
     // LayerGroup holding all directional arrows (rendered on top of routes)
     const arrowsContainer = new L.LayerGroup().addTo(map);
     arrowsContainerRef.current = arrowsContainer;
+    (mapContainerRef.current as any)._leaflet_map = map;
+    (mapContainerRef.current as any)._arrows_container = arrowsContainer;
+    (mapContainerRef.current as any)._drawn_items = drawnItems;
     const arrowLayersMap = arrowLayersMapRef.current;
 
     // Configure Geoman controls
@@ -746,7 +758,17 @@ export function RouteMap({
       }
     };
 
-    const handlePmRemove = () => {
+    const handlePmRemove = (e: any) => {
+      if (e.layer) {
+        const oldGroup = arrowLayersMapRef.current.get(e.layer);
+        if (oldGroup && arrowsContainerRef.current) {
+          arrowsContainerRef.current.removeLayer(oldGroup);
+          arrowLayersMapRef.current.delete(e.layer);
+        }
+        if (drawnItems.hasLayer(e.layer)) {
+          drawnItems.removeLayer(e.layer);
+        }
+      }
       setTimeout(syncLayers, 20);
     };
 
@@ -1091,9 +1113,12 @@ export function RouteMap({
       {/* Floating Active Category Bar */}
       <RouteColorsBar
         categories={categories}
+        activeCategoryIds={activeCategoryIds}
         activeCategory={activeCategory}
         onSelectCategory={onActiveCategoryChange}
         onRenameCategory={onRenameCategory}
+        onAddCategory={onAddCategory}
+        onRemoveCategory={onRemoveCategory}
       />
 
       {/* Floating Basemap Toggle Button (Placed to the left beside the panel) */}

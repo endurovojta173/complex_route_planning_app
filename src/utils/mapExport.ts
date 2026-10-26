@@ -1,4 +1,6 @@
+import L from 'leaflet';
 import { createMapPdfBlob, type PdfExportOptions } from './pdfGenerator';
+import { generatePolylineArrows } from './routeArrows';
 
 /**
  * Downloads any Blob file to user's computer
@@ -15,7 +17,331 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 /**
- * Captures the current Leaflet map viewport (tiles, vector overlay paths, markers)
+ * Draws a single directional navigation arrow precisely onto the canvas
+ * at the exact (x, y) coordinates with specified bearing and color.
+ */
+interface ExportArrowItem {
+  pos: { x: number; y: number };
+  bearing: number;
+  color: string;
+}
+
+/**
+ * Robustly collects all active directional arrows for the map view.
+ * 1. Recursively traverses the arrowsContainer (handling nested LayerGroups).
+ * 2. Fallbacks to generating arrows from all active polylines if container is empty.
+ */
+function getMapArrows(mapContainer: HTMLElement): ExportArrowItem[] {
+  const map: any = (mapContainer as any)._leaflet_map;
+  if (!map || typeof map.latLngToContainerPoint !== 'function') {
+    return [];
+  }
+
+  const arrows: ExportArrowItem[] = [];
+  const arrowsContainer: any = (mapContainer as any)._arrows_container;
+
+  // 1. Traverse arrowsContainer recursively
+  if (arrowsContainer && typeof arrowsContainer.eachLayer === 'function') {
+    const visit = (layer: any) => {
+      if (!layer) return;
+      if (typeof layer.getLatLng === 'function' && typeof layer.options?.arrowBearing === 'number') {
+        const latlng = layer.getLatLng();
+        const pos = map.latLngToContainerPoint(latlng);
+        if (pos) {
+          arrows.push({
+            pos,
+            bearing: layer.options.arrowBearing,
+            color: layer.options.arrowColor || '#2ebd7f',
+          });
+        }
+      } else if (typeof layer.eachLayer === 'function') {
+        layer.eachLayer((child: any) => visit(child));
+      }
+    };
+    arrowsContainer.eachLayer((child: any) => visit(child));
+  }
+
+  // 2. Fallback: if arrowsContainer is empty, generate from all active polylines
+  if (arrows.length === 0) {
+    const drawnItems: any = (mapContainer as any)._drawn_items;
+    const targetGroup = drawnItems && typeof drawnItems.eachLayer === 'function' ? drawnItems : map;
+
+    if (targetGroup && typeof targetGroup.eachLayer === 'function') {
+      targetGroup.eachLayer((layer: any) => {
+        if (layer instanceof L.Polyline && !(layer instanceof L.Polygon)) {
+          if (layer.feature?.properties?.showArrows !== false) {
+            const color =
+              layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
+            const markers = generatePolylineArrows(layer, color);
+            for (const marker of markers) {
+              const bearing = (marker.options as any)?.arrowBearing;
+              const markerColor = (marker.options as any)?.arrowColor || color;
+              if (typeof bearing === 'number' && typeof marker.getLatLng === 'function') {
+                const pos = map.latLngToContainerPoint(marker.getLatLng());
+                if (pos) {
+                  arrows.push({
+                    pos,
+                    bearing,
+                    color: markerColor,
+                  });
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  return arrows;
+}
+
+/**
+ * Draws a single directional navigation arrow precisely onto the canvas
+ * at the exact (x, y) coordinates with specified bearing and color.
+ */
+function drawDirectionArrow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  bearing: number,
+  color: string
+): void {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate((bearing * Math.PI) / 180);
+
+  // Subtle dark drop shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
+  ctx.shadowBlur = 3;
+  ctx.shadowOffsetY = 1;
+
+  // Arrowhead path: tip pointing North/Up (0 deg)
+  // Matching createArrowIcon geometry exactly (centered at 0, 0):
+  // M 0 -9 L 7.5 3.5 L 0 0 L -7.5 3.5 Z
+  ctx.beginPath();
+  ctx.moveTo(0, -9);
+  ctx.lineTo(7.5, 3.5);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(-7.5, 3.5);
+  ctx.closePath();
+
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // Reset shadow for crisp white stroke
+  ctx.shadowColor = 'transparent';
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
+ * Normalizes any Leaflet path coordinate structure into an array of coordinate rings.
+ */
+function getLayerRings(layer: any): L.LatLng[][] {
+  if (typeof layer.getLatLngs !== 'function') return [];
+  const raw = layer.getLatLngs();
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+
+  if (raw[0] && typeof raw[0].lat === 'number') {
+    return [raw as L.LatLng[]];
+  }
+
+  if (Array.isArray(raw[0]) && raw[0][0] && typeof raw[0][0].lat === 'number') {
+    return raw as L.LatLng[][];
+  }
+
+  const flattened: L.LatLng[][] = [];
+  const recurse = (arr: any[]) => {
+    if (!Array.isArray(arr) || arr.length === 0) return;
+    if (arr[0] && typeof arr[0].lat === 'number') {
+      flattened.push(arr as L.LatLng[]);
+    } else {
+      arr.forEach((item) => {
+        if (Array.isArray(item)) recurse(item);
+      });
+    }
+  };
+  recurse(raw);
+  return flattened;
+}
+
+/**
+ * Draws a Leaflet vector path (Polyline, Polygon, Rectangle, CircleMarker) directly
+ * onto the 2D canvas using the map's exact projection.
+ */
+function drawVectorLayerToCanvas(
+  ctx: CanvasRenderingContext2D,
+  layer: any,
+  map: any
+): void {
+  if (!layer) return;
+
+  // Handle Circle or CircleMarker
+  if (typeof layer.getRadius === 'function' && typeof layer.getLatLng === 'function') {
+    const center = map.latLngToContainerPoint(layer.getLatLng());
+    const radius = layer.getRadius();
+    const strokeColor = layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
+    const fillColor = layer.options?.fillColor || layer.feature?.properties?.fillColor || strokeColor;
+    const weight = typeof layer.options?.weight === 'number' ? layer.options.weight : 3;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+    if (weight > 0) {
+      ctx.lineWidth = weight;
+      ctx.strokeStyle = strokeColor;
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (typeof layer.getLatLngs !== 'function') return;
+
+  const isPolygon =
+    layer instanceof L.Polygon ||
+    layer.feature?.geometry?.type === 'Polygon' ||
+    layer.feature?.geometry?.type === 'MultiPolygon' ||
+    Boolean(layer.pm?.getShape && layer.pm.getShape().includes('Polygon'));
+
+  const rings = getLayerRings(layer);
+  if (rings.length === 0) return;
+
+  const strokeColor =
+    layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
+  const fillColor =
+    layer.options?.fillColor || layer.feature?.properties?.fillColor || strokeColor;
+  const weight = typeof layer.options?.weight === 'number' ? layer.options.weight : 4;
+  const opacity = typeof layer.options?.opacity === 'number' ? layer.options.opacity : 0.9;
+  const fillOpacity =
+    typeof layer.options?.fillOpacity === 'number'
+      ? layer.options.fillOpacity
+      : isPolygon
+        ? 0.25
+        : 0;
+
+  ctx.save();
+
+  // Draw polygon fill
+  if (isPolygon && fillOpacity > 0) {
+    ctx.beginPath();
+    for (const ring of rings) {
+      if (ring.length === 0) continue;
+      for (let i = 0; i < ring.length; i++) {
+        const pt = map.latLngToContainerPoint(ring[i]);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      ctx.closePath();
+    }
+    ctx.globalAlpha = fillOpacity;
+    ctx.fillStyle = fillColor;
+    ctx.fill('evenodd');
+  }
+
+  // Draw vector stroke outline
+  if (weight > 0 && opacity > 0) {
+    ctx.globalAlpha = opacity;
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = weight;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    if (layer.options?.dashArray) {
+      const dashes = String(layer.options.dashArray)
+        .split(',')
+        .map((n) => parseFloat(n.trim()))
+        .filter((n) => !isNaN(n));
+      if (dashes.length > 0) {
+        ctx.setLineDash(dashes);
+      }
+    }
+
+    for (const ring of rings) {
+      if (ring.length < 2) continue;
+      ctx.beginPath();
+      for (let i = 0; i < ring.length; i++) {
+        const pt = map.latLngToContainerPoint(ring[i]);
+        if (i === 0) ctx.moveTo(pt.x, pt.y);
+        else ctx.lineTo(pt.x, pt.y);
+      }
+      if (isPolygon) {
+        ctx.closePath();
+      }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Converts a Leaflet vector path into an SVG path element in exact container coordinates.
+ */
+function layerToSvgPath(layer: any, map: any): string {
+  if (!layer) return '';
+
+  if (typeof layer.getRadius === 'function' && typeof layer.getLatLng === 'function') {
+    const center = map.latLngToContainerPoint(layer.getLatLng());
+    const radius = layer.getRadius();
+    const strokeColor = layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
+    const fillColor = layer.options?.fillColor || layer.feature?.properties?.fillColor || strokeColor;
+    const weight = typeof layer.options?.weight === 'number' ? layer.options.weight : 3;
+    return `<circle cx="${center.x.toFixed(1)}" cy="${center.y.toFixed(1)}" r="${radius.toFixed(1)}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="${weight}" />`;
+  }
+
+  if (typeof layer.getLatLngs !== 'function') return '';
+
+  const isPolygon =
+    layer instanceof L.Polygon ||
+    layer.feature?.geometry?.type === 'Polygon' ||
+    layer.feature?.geometry?.type === 'MultiPolygon' ||
+    Boolean(layer.pm?.getShape && layer.pm.getShape().includes('Polygon'));
+
+  const rings = getLayerRings(layer);
+  if (rings.length === 0) return '';
+
+  const strokeColor =
+    layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
+  const fillColor =
+    layer.options?.fillColor || layer.feature?.properties?.fillColor || strokeColor;
+  const weight = typeof layer.options?.weight === 'number' ? layer.options.weight : 4;
+  const opacity = typeof layer.options?.opacity === 'number' ? layer.options.opacity : 0.9;
+  const fillOpacity =
+    typeof layer.options?.fillOpacity === 'number'
+      ? layer.options.fillOpacity
+      : isPolygon
+        ? 0.25
+        : 0;
+
+  let d = '';
+  for (const ring of rings) {
+    if (ring.length === 0) continue;
+    for (let i = 0; i < ring.length; i++) {
+      const pt = map.latLngToContainerPoint(ring[i]);
+      d += `${i === 0 ? 'M' : 'L'} ${pt.x.toFixed(1)} ${pt.y.toFixed(1)} `;
+    }
+    if (isPolygon) {
+      d += 'Z ';
+    }
+  }
+
+  const fillRule = isPolygon ? 'fill-rule="evenodd"' : '';
+  const fillAttr = isPolygon && fillOpacity > 0 ? `fill="${fillColor}" fill-opacity="${fillOpacity}"` : 'fill="none"';
+  const strokeAttr = weight > 0 ? `stroke="${strokeColor}" stroke-width="${weight}" stroke-opacity="${opacity}" stroke-linecap="round" stroke-linejoin="round"` : '';
+
+  return `<path d="${d.trim()}" ${fillAttr} ${strokeAttr} ${fillRule} />`;
+}
+
+/**
+ * Captures the current Leaflet map viewport (tiles, vector overlay paths, markers, direction arrows)
  * onto an HTML Canvas element.
  */
 export async function renderMapToCanvas(
@@ -63,83 +389,89 @@ export async function renderMapToCanvas(
     }
   }
 
-  // 2. Draw Leaflet vector overlay SVG (polylines, polygons, arrows)
-  const overlaySvg = mapContainer.querySelector<SVGSVGElement>('.leaflet-overlay-pane svg');
-  if (overlaySvg) {
-    try {
-      const svgRect = overlaySvg.getBoundingClientRect();
-      const svgX = svgRect.left - rect.left;
-      const svgY = svgRect.top - rect.top;
-      const svgW = svgRect.width;
-      const svgH = svgRect.height;
+  // 2. Draw all vector routes and polygons directly using Leaflet map coordinates
+  // (Guarantees 100% mathematical precision with tiles and direction arrows, eliminating all DOM transform drift)
+  const map: any = (mapContainer as any)._leaflet_map;
+  if (map && typeof map.latLngToContainerPoint === 'function') {
+    const layersToDraw: any[] = [];
+    const seen = new Set<any>();
 
-      // Clone SVG and set explicit dimensions and xmlns attributes
-      const clonedSvg = overlaySvg.cloneNode(true) as SVGSVGElement;
-      clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-      clonedSvg.setAttribute('width', `${svgW}`);
-      clonedSvg.setAttribute('height', `${svgH}`);
+    const collectLayer = (l: any) => {
+      if (!l || seen.has(l)) return;
+      if (typeof l.getLatLngs === 'function' || typeof l.getRadius === 'function') {
+        seen.add(l);
+        layersToDraw.push(l);
+      } else if (typeof l.eachLayer === 'function' && !(l instanceof L.Polyline)) {
+        l.eachLayer((child: any) => collectLayer(child));
+      }
+    };
 
-      const serializer = new XMLSerializer();
-      const svgString = serializer.serializeToString(clonedSvg);
-      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-      const svgUrl = URL.createObjectURL(svgBlob);
+    const drawnItems: any = (mapContainer as any)._drawn_items;
+    if (drawnItems && typeof drawnItems.eachLayer === 'function') {
+      drawnItems.eachLayer(collectLayer);
+    }
 
-      await new Promise<void>((resolve) => {
-        const svgImg = new Image();
-        const timeout = setTimeout(() => {
-          URL.revokeObjectURL(svgUrl);
-          resolve();
-        }, 2000);
-
-        svgImg.onload = () => {
-          clearTimeout(timeout);
-          try {
-            ctx.drawImage(svgImg, svgX, svgY, svgW, svgH);
-          } catch (e) {
-            console.warn('drawImage failed:', e);
-          }
-          URL.revokeObjectURL(svgUrl);
-          resolve();
-        };
-        svgImg.onerror = () => {
-          clearTimeout(timeout);
-          URL.revokeObjectURL(svgUrl);
-          resolve();
-        };
-        svgImg.src = svgUrl;
+    if (typeof map.eachLayer === 'function') {
+      map.eachLayer((l: any) => {
+        if (l instanceof L.Path && !seen.has(l)) {
+          collectLayer(l);
+        }
       });
-    } catch (err) {
-      console.warn('Could not draw SVG overlay to canvas:', err);
+    }
+
+    for (const l of layersToDraw) {
+      drawVectorLayerToCanvas(ctx, l, map);
     }
   }
 
-  // 3. Draw Marker Icons & Direction Arrows from marker pane
+  // 3. Draw Direction Arrows with exact vector coordinates (no DOM rotation offset)
+  const arrows = getMapArrows(mapContainer);
+  for (const arrow of arrows) {
+    drawDirectionArrow(ctx, arrow.pos.x, arrow.pos.y, arrow.bearing, arrow.color);
+  }
+
+  // 4. Draw other non-arrow markers (e.g. search pin, waypoints) from marker pane
   const markerPane = mapContainer.querySelector('.leaflet-marker-pane');
   if (markerPane) {
-    const markerDivs = Array.from(markerPane.querySelectorAll<HTMLElement>('.leaflet-marker-icon'));
+    const markerDivs = Array.from(markerPane.querySelectorAll<HTMLElement>('.leaflet-marker-icon'))
+      .filter((m) => !m.classList.contains('route-direction-arrow-icon'));
+
     for (const marker of markerDivs) {
       const mRect = marker.getBoundingClientRect();
       const x = mRect.left - rect.left;
       const y = mRect.top - rect.top;
 
-      // If marker contains SVG
       const markerSvg = marker.querySelector('svg');
       if (markerSvg) {
         try {
           const sClone = markerSvg.cloneNode(true) as SVGSVGElement;
           sClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+          sClone.setAttribute('width', `${mRect.width}`);
+          sClone.setAttribute('height', `${mRect.height}`);
+
           const sStr = new XMLSerializer().serializeToString(sClone);
           const sBlob = new Blob([sStr], { type: 'image/svg+xml;charset=utf-8' });
           const sUrl = URL.createObjectURL(sBlob);
 
           await new Promise<void>((res) => {
             const mImg = new Image();
+            const timeout = setTimeout(() => {
+              URL.revokeObjectURL(sUrl);
+              res();
+            }, 1000);
+
             mImg.onload = () => {
-              ctx.drawImage(mImg, x, y, mRect.width, mRect.height);
+              clearTimeout(timeout);
+              try {
+                ctx.drawImage(mImg, x, y, mRect.width, mRect.height);
+              } catch {
+                // Ignore
+              }
               URL.revokeObjectURL(sUrl);
               res();
             };
             mImg.onerror = () => {
+              clearTimeout(timeout);
               URL.revokeObjectURL(sUrl);
               res();
             };
@@ -152,7 +484,7 @@ export async function renderMapToCanvas(
     }
   }
 
-  // 4. Draw North Arrow / Compass badge in corner
+  // 5. Draw North Arrow / Compass badge in corner
   drawNorthArrow(ctx, width - 45, 45);
 
   return canvas;
@@ -214,20 +546,58 @@ export async function exportMapToPdf(
 }
 
 /**
- * Exports the route vectors as a standalone SVG file
+ * Exports the route vectors and directional arrows as a standalone SVG file
  */
 export function exportMapToSvg(
   mapContainer: HTMLElement,
   title: string
 ): void {
-  const overlaySvg = mapContainer.querySelector<SVGSVGElement>('.leaflet-overlay-pane svg');
+  const map: any = (mapContainer as any)._leaflet_map;
   const rect = mapContainer.getBoundingClientRect();
   const width = Math.round(rect.width);
   const height = Math.round(rect.height);
 
-  let innerSvgContent = '';
-  if (overlaySvg) {
-    innerSvgContent = overlaySvg.innerHTML;
+  let routesSvg = '';
+  if (map && typeof map.latLngToContainerPoint === 'function') {
+    const layersToDraw: any[] = [];
+    const seen = new Set<any>();
+
+    const collectLayer = (l: any) => {
+      if (!l || seen.has(l)) return;
+      if (typeof l.getLatLngs === 'function' || typeof l.getRadius === 'function') {
+        seen.add(l);
+        layersToDraw.push(l);
+      } else if (typeof l.eachLayer === 'function' && !(l instanceof L.Polyline)) {
+        l.eachLayer((child: any) => collectLayer(child));
+      }
+    };
+
+    const drawnItems: any = (mapContainer as any)._drawn_items;
+    if (drawnItems && typeof drawnItems.eachLayer === 'function') {
+      drawnItems.eachLayer(collectLayer);
+    }
+
+    if (typeof map.eachLayer === 'function') {
+      map.eachLayer((l: any) => {
+        if (l instanceof L.Path && !seen.has(l)) {
+          collectLayer(l);
+        }
+      });
+    }
+
+    for (const l of layersToDraw) {
+      routesSvg += `    ${layerToSvgPath(l, map)}\n`;
+    }
+  }
+
+  // Include directional arrows in the SVG export
+  let arrowsSvg = '';
+  const arrows = getMapArrows(mapContainer);
+  for (const arrow of arrows) {
+    arrowsSvg += `
+      <g transform="translate(${arrow.pos.x.toFixed(1)}, ${arrow.pos.y.toFixed(1)}) rotate(${arrow.bearing.toFixed(1)})">
+        <path d="M 0 -9 L 7.5 3.5 L 0 0 L -7.5 3.5 Z" fill="${arrow.color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
+      </g>`;
   }
 
   const svgDoc = `<?xml version="1.0" encoding="UTF-8"?>
@@ -236,7 +606,9 @@ export function exportMapToSvg(
   <desc>Exported from CRP - Complex Route Planning App</desc>
   <rect width="${width}" height="${height}" fill="#051d18" />
   <g id="route-layers">
-    ${innerSvgContent}
+${routesSvg}  </g>
+  <g id="route-arrows">
+    ${arrowsSvg}
   </g>
 </svg>`;
 

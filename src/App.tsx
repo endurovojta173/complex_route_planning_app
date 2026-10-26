@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
@@ -11,6 +11,10 @@ import {
   DEFAULT_CATEGORY,
   getSavedCategories,
   saveCustomCategoryName,
+  getActiveCategoryIds,
+  saveActiveCategoryIds,
+  getCategoryById,
+  getCategoryByColor,
   type RouteCategory,
 } from './utils/routeColors';
 import {
@@ -33,7 +37,12 @@ export default function App() {
   const [isMapsModalOpen, setIsMapsModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<RouteCategory>(() => getSavedCategories()[0] || DEFAULT_CATEGORY);
+  const [activeCategoryIds, setActiveCategoryIds] = useState<string[]>(() => getActiveCategoryIds());
+  const [activeCategory, setActiveCategory] = useState<RouteCategory>(() => {
+    const list = getSavedCategories();
+    const activeIds = getActiveCategoryIds();
+    return list.find((c) => c.id === activeIds[0]) || list[0] || DEFAULT_CATEGORY;
+  });
 
   const activeMap = savedMaps.find((m) => m.id === activeMapId) || savedMaps[0];
 
@@ -169,6 +178,47 @@ export default function App() {
     showNotification(`Barva přejmenována na: ${catItem?.name || newName}`);
   };
 
+  const handleAddCategory = (id: string) => {
+    setActiveCategoryIds((prev) => {
+      if (prev.includes(id)) return prev;
+      const next = [...prev, id];
+      saveActiveCategoryIds(next);
+      return next;
+    });
+  };
+
+  const handleRemoveCategory = (id: string) => {
+    setActiveCategoryIds((prev) => {
+      if (prev.length <= 1) return prev;
+      const next = prev.filter((catId) => catId !== id);
+      saveActiveCategoryIds(next);
+      if (activeCategory.id === id) {
+        const fallback = categories.find((c) => c.id === next[0]) || categories[0];
+        setActiveCategory(fallback);
+      }
+      return next;
+    });
+  };
+
+  // Combine user-activated category IDs with any categories used on current map
+  const effectiveCategoryIds = useMemo(() => {
+    const ids = new Set(activeCategoryIds);
+    if (currentGeoJson && currentGeoJson.features) {
+      for (const f of currentGeoJson.features) {
+        const role = f.properties?.role;
+        const col = f.properties?.color;
+        if (role) {
+          const cat = getCategoryById(role, categories);
+          if (cat) ids.add(cat.id);
+        } else if (col) {
+          const cat = getCategoryByColor(col, categories);
+          if (cat) ids.add(cat.id);
+        }
+      }
+    }
+    return Array.from(ids);
+  }, [activeCategoryIds, currentGeoJson, categories]);
+
   const handleExport = () => {
     const dataToExport = currentGeoJson || activeMap?.geoJson;
     if (!dataToExport || dataToExport.features.length === 0) {
@@ -278,6 +328,9 @@ export default function App() {
           activeCategory={activeCategory}
           onActiveCategoryChange={setActiveCategory}
           categories={categories}
+          activeCategoryIds={effectiveCategoryIds}
+          onAddCategory={handleAddCategory}
+          onRemoveCategory={handleRemoveCategory}
           onRenameCategory={handleRenameCategory}
         />
       </main>

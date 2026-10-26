@@ -51,11 +51,18 @@ export function generatePolylineArrows(layer: L.Polyline, color: string): L.Mark
 
   if (!flat || flat.length < 2) return [];
 
+  const isPolygon =
+    layer instanceof L.Polygon ||
+    (layer as any).feature?.geometry?.type === 'Polygon' ||
+    (layer as any).feature?.geometry?.type === 'MultiPolygon' ||
+    Boolean((layer as any).pm?.getShape && (layer as any).pm.getShape().includes('Polygon'));
+
+  const segmentsCount = isPolygon ? flat.length : flat.length - 1;
   const markers: L.Marker[] = [];
 
-  for (let i = 0; i < flat.length - 1; i++) {
+  for (let i = 0; i < segmentsCount; i++) {
     const p1 = flat[i];
-    const p2 = flat[i + 1];
+    const p2 = flat[(i + 1) % flat.length];
     if (!p1 || !p2) continue;
 
     const distMeters = calculateHaversineDistance(p1.lat, p1.lng, p2.lat, p2.lng) * 1000;
@@ -75,7 +82,9 @@ export function generatePolylineArrows(layer: L.Polyline, color: string): L.Mark
         icon: createArrowIcon(color, bearing),
         interactive: false,
         pmIgnore: true,
-      });
+        arrowColor: color,
+        arrowBearing: bearing,
+      } as any);
 
       markers.push(marker);
     }

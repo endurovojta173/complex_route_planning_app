@@ -9,6 +9,37 @@ export interface RouteCategory {
 }
 
 export const CATEGORY_NAMES_STORAGE_KEY = 'complex_route_planner_color_names';
+export const ACTIVE_CATEGORIES_STORAGE_KEY = 'complex_route_planner_active_categories';
+
+/**
+ * Loads list of active category IDs shown on the toolbar.
+ * By default, starts with only 1 color (Zelená - 'parade').
+ */
+export function getActiveCategoryIds(): string[] {
+  try {
+    const raw = localStorage.getItem(ACTIVE_CATEGORIES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load active category IDs from localStorage:', err);
+  }
+  return ['parade'];
+}
+
+/**
+ * Persists the active category IDs list to localStorage.
+ */
+export function saveActiveCategoryIds(ids: string[]): void {
+  try {
+    localStorage.setItem(ACTIVE_CATEGORIES_STORAGE_KEY, JSON.stringify(ids));
+  } catch (err) {
+    console.error('Failed to save active category IDs to localStorage:', err);
+  }
+}
 
 export const DEFAULT_ROUTE_CATEGORIES: RouteCategory[] = [
   {

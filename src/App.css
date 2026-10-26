@@ -1454,6 +1454,121 @@
   color: var(--accent-primary);
 }
 
+.palette-chip-wrapper {
+  display: inline-flex;
+  align-items: center;
+}
+
+.chip-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 1px 2px;
+  border-radius: 2px;
+  transition: all 120ms ease;
+  margin-left: 2px;
+}
+
+.palette-chip:hover .chip-remove-btn {
+  opacity: 0.6;
+}
+
+.chip-remove-btn:hover {
+  opacity: 1 !important;
+  color: #f43f5e;
+}
+
+/* Palette Add Button & Dropdown */
+.palette-add-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.palette-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 26px;
+  padding: 0 0.55rem;
+  background: var(--bg-surface);
+  border: 1px dashed var(--border-accent);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.palette-add-btn:hover,
+.palette-add-btn.open {
+  background: var(--bg-card);
+  border-color: var(--accent-primary);
+  border-style: solid;
+  color: var(--accent-primary);
+}
+
+.palette-add-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 150px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-card);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  padding: 0.4rem;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.palette-add-dropdown-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 0.2rem 0.45rem;
+}
+
+.palette-add-dropdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.palette-add-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.74rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--transition-fast);
+  width: 100%;
+}
+
+.palette-add-dropdown-item:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-accent);
+  color: #ffffff;
+}
+
+.palette-add-item-name {
+  white-space: nowrap;
+}
+
 .chip-dot {
   width: 8px;
   height: 8px;
