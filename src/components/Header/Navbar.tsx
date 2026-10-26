@@ -37,13 +37,8 @@ export function Navbar({
           if (e.key === 'Enter' || e.key === ' ') onOpenInfoModal();
         }}
       >
-        <div className="brand-icon">
-          <Navigation size={18} />
-        </div>
-        <div className="brand-info">
-          <span className="brand-title">CRP</span>
-          <span className="brand-subtitle">complex route planning app</span>
-        </div>
+        <Navigation size={20} className="brand-icon-simple" />
+        <span className="brand-title">CRP</span>
       </div>
 
       <div className="navbar-center">

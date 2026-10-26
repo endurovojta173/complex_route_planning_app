@@ -15,8 +15,8 @@ export const DEFAULT_ROUTE_CATEGORIES: RouteCategory[] = [
     id: 'parade',
     name: 'Zelená',
     shortName: 'Zelená',
-    color: '#5fe08d', // Cestovniq mint green
-    fillColor: '#5fe08d',
+    color: '#2ebd7f', // Mobile app mint green
+    fillColor: '#2ebd7f',
     description: 'Zelená barva trasy',
     baseColorName: 'Zelená',
   },

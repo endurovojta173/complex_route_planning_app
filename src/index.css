@@ -1,42 +1,40 @@
 :root {
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   
-  /* Cestovniq Dark Forest Teal Palette */
-  --bg-primary: #062521;
-  --bg-secondary: #0a2d28;
-  --bg-glass: rgba(6, 37, 33, 0.95);
-  --bg-glass-card: rgba(19, 67, 61, 0.88);
-  --bg-glass-hover: rgba(26, 85, 76, 0.94);
-  --bg-card: #13433d;
-  --bg-card-subtle: #0f3731;
+  /* Mobile App Deep Pine & Clean Mint Palette (No Toxic Green, No Glows) */
+  --bg-primary: #051d18;
+  --bg-secondary: #092722;
+  --bg-surface: #0f352e;
+  --bg-card: #0d312a;
+  --bg-card-subtle: #08231d;
   
-  --border-subtle: rgba(255, 255, 255, 0.08);
-  --border-accent: #1e5850;
-  --border-highlight: #5fe08d;
-  --border-card: #1a4f47;
+  --border-subtle: #123830;
+  --border-accent: #194d42;
+  --border-highlight: #2ebd7f;
+  --border-card: #15443a;
   
   --text-primary: #ffffff;
-  --text-secondary: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-secondary: #e2e8f0;
+  --text-muted: #8fa7a1;
+  --text-dim: #5c756f;
   
-  /* Vibrant Accent Palette from Cestovniq */
-  --accent-primary: #5fe08d;
-  --accent-primary-hover: #4ed880;
-  --accent-primary-text: #062521;
-  --accent-mint: #5fe08d;
-  --accent-sage: #85bfb3;
-  --accent-dark-teal: #13433d;
-  --accent-deep: #062521;
-  --accent-rose: #f43f5e;
+  /* Natural Accents from Mobile App */
+  --accent-primary: #2ebd7f;
+  --accent-primary-hover: #26a870;
+  --accent-primary-text: #041c17;
+  --accent-mint: #2ebd7f;
+  --accent-sage: #8fa7a1;
+  --accent-dark-teal: #0d312a;
+  --accent-deep: #051d18;
+  --accent-rose: #ef4444;
   --accent-amber: #f59e0b;
   --accent-orange: #ea580c;
   
-  /* Refined Modern Shadows */
-  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 8px -1px rgba(0, 0, 0, 0.35), 0 2px 4px -2px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 12px 24px -4px rgba(0, 0, 0, 0.45), 0 4px 8px -4px rgba(0, 0, 0, 0.35);
-  --shadow-panel: 0 12px 36px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(95, 224, 141, 0.15);
+  /* Solid Crisp Shadows (No Glows!) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.55);
+  --shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.6);
 
   --radius-sm: 6px;
   --radius-md: 10px;

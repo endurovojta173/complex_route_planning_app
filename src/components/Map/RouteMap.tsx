@@ -301,7 +301,7 @@ export function RouteMap({
         radius: 8,
         color: '#ffffff',
         weight: 3,
-        fillColor: (polyline.options as any).color || '#5fe08d',
+        fillColor: (polyline.options as any).color || '#2ebd7f',
         fillOpacity: 0.95,
         interactive: false,
         pmIgnore: true,
@@ -816,7 +816,7 @@ export function RouteMap({
       let closestPolyline: L.Polyline | null = null;
       let minDistance = 35;
       let snappedPt: L.LatLng | null = null;
-      let polylineColor = '#5fe08d';
+      let polylineColor = '#2ebd7f';
 
       drawnItemsRef.current.eachLayer((layer: any) => {
         if (isPolylineLayer(layer)) {
@@ -825,7 +825,7 @@ export function RouteMap({
             minDistance = match.distancePx;
             closestPolyline = layer;
             snappedPt = match.snappedLatLng;
-            polylineColor = layer.options?.color || layer.feature?.properties?.color || '#5fe08d';
+            polylineColor = layer.options?.color || layer.feature?.properties?.color || '#2ebd7f';
           }
         }
       });
