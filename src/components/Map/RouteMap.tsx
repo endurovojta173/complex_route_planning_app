@@ -20,7 +20,8 @@ import {
   type RouteCategory,
 } from '../../utils/routeColors';
 import { RouteColorsBar } from './RouteColorsBar';
-import { Map, Satellite } from 'lucide-react';
+import { Map as MapIcon, Satellite, Navigation } from 'lucide-react';
+import { generatePolylineArrows } from '../../utils/routeArrows';
 
 // Fix Leaflet default marker icons for bundlers
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
@@ -59,6 +60,25 @@ function createColoredMarkerIcon(color: string) {
   });
 }
 
+function isPolylineLayer(layer: any): boolean {
+  if (!layer || typeof layer.getLatLngs !== 'function') return false;
+  const pmShape = layer.pm?.getShape?.();
+  if (pmShape === 'Polygon' || pmShape === 'Rectangle') return false;
+  if (
+    layer.pm?._shape &&
+    (layer.pm._shape.includes('Polygon') || layer.pm._shape.includes('Rectangle'))
+  ) {
+    return false;
+  }
+  if (
+    layer.feature?.geometry?.type === 'Polygon' ||
+    layer.feature?.geometry?.type === 'MultiPolygon'
+  ) {
+    return false;
+  }
+  return true;
+}
+
 interface RouteMapProps {
   tileProviderId: TileProviderId;
   onTileSelect: (id: TileProviderId) => void;
@@ -92,6 +112,14 @@ export function RouteMap({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const searchMarkerRef = useRef<L.Layer | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
+  const [showGlobalArrows, setShowGlobalArrows] = useState(true);
+  const showGlobalArrowsRef = useRef(true);
+  const arrowLayersMapRef = useRef<Map<L.Layer, L.LayerGroup>>(new Map());
+  const arrowsContainerRef = useRef<L.LayerGroup | null>(null);
+
+  useEffect(() => {
+    showGlobalArrowsRef.current = showGlobalArrows;
+  }, [showGlobalArrows]);
 
   const categoriesRef = useRef(categories);
   const onStatsChangeRef = useRef(onStatsChange);
@@ -118,6 +146,10 @@ export function RouteMap({
         const roleName = layer.feature?.properties?.roleName || 'Zelená';
         const color = layer.options?.color || layer.feature?.properties?.color || DEFAULT_CATEGORY.color;
         const fillColor = layer.options?.fillColor || layer.feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+        const showArrows =
+          layer.feature?.properties?.showArrows !== undefined
+            ? layer.feature.properties.showArrows
+            : true;
 
         const name =
           layer.feature?.properties?.name !== undefined
@@ -133,6 +165,7 @@ export function RouteMap({
             fillColor,
             stroke: color,
             'stroke-width': 4,
+            showArrows,
           };
           if (name) {
             geo.properties.name = name;
@@ -150,6 +183,7 @@ export function RouteMap({
               fillColor,
               stroke: color,
               'stroke-width': 4,
+              showArrows,
             };
             if (name) {
               feat.properties.name = name;
@@ -175,6 +209,75 @@ export function RouteMap({
     }
   }, []);
 
+  // Update or regenerate directional arrows for a polyline layer
+  const updateLayerArrows = useCallback((layer: any) => {
+    if (!arrowsContainerRef.current) return;
+    if (!isPolylineLayer(layer)) return;
+
+    // Remove previous arrow markers for this layer if any
+    const existingGroup = arrowLayersMapRef.current.get(layer);
+    if (existingGroup) {
+      arrowsContainerRef.current.removeLayer(existingGroup);
+      arrowLayersMapRef.current.delete(layer);
+    }
+
+    // Check if direction arrows are enabled globally and for this specific route
+    const layerArrowsEnabled = layer.feature?.properties?.showArrows !== false;
+    if (!showGlobalArrowsRef.current || !layerArrowsEnabled) {
+      return;
+    }
+
+    const color =
+      layer.options?.color || layer.feature?.properties?.color || DEFAULT_CATEGORY.color;
+    const arrowMarkers = generatePolylineArrows(layer, color);
+
+    if (arrowMarkers.length > 0) {
+      const group = new L.LayerGroup(arrowMarkers);
+      arrowsContainerRef.current.addLayer(group);
+      arrowLayersMapRef.current.set(layer, group);
+    }
+  }, []);
+
+  // Reverse polyline vertex direction and reorient arrows
+  const reversePolylineDirection = useCallback(
+    (layer: any) => {
+      if (!isPolylineLayer(layer)) return;
+      const latlngs = layer.getLatLngs();
+      if (!latlngs) return;
+
+      if (Array.isArray(latlngs)) {
+        if (Array.isArray(latlngs[0])) {
+          const reversed = (latlngs as any[]).map((sub) =>
+            Array.isArray(sub) ? [...sub].reverse() : sub
+          );
+          layer.setLatLngs(reversed);
+        } else {
+          const reversed = [...latlngs].reverse();
+          layer.setLatLngs(reversed);
+        }
+      }
+
+      updateLayerArrows(layer);
+      syncLayers();
+    },
+    [updateLayerArrows, syncLayers]
+  );
+
+  // Toggle global arrows across all routes
+  const toggleGlobalArrows = useCallback(() => {
+    setShowGlobalArrows((prev) => {
+      const next = !prev;
+      showGlobalArrowsRef.current = next;
+
+      if (drawnItemsRef.current) {
+        drawnItemsRef.current.eachLayer((layer: any) => {
+          updateLayerArrows(layer);
+        });
+      }
+      return next;
+    });
+  }, [updateLayerArrows]);
+
   // Update a specific layer's category and recolor it
   const updateLayerCategory = useCallback(
     (layer: any, newCat: RouteCategory) => {
@@ -199,9 +302,10 @@ export function RouteMap({
         layer.setIcon(createColoredMarkerIcon(newCat.color));
       }
 
+      updateLayerArrows(layer);
       syncLayers();
     },
-    [syncLayers]
+    [syncLayers, updateLayerArrows]
   );
 
   // Build the recoloring popup for any drawn layer
@@ -221,8 +325,10 @@ export function RouteMap({
 
       const isMarker = typeof layer.getLatLng === 'function' && typeof layer.getLatLngs !== 'function';
       const isPolygon = typeof layer.getLatLngs === 'function' && layer.pm?.getShape?.() === 'Polygon';
+      const isPolyline = isPolylineLayer(layer);
       const typeLabel = isMarker ? 'Bod' : isPolygon ? 'Polygon' : 'Úsek';
       const currentName = layer.feature?.properties?.name || '';
+      const layerArrowsActive = layer.feature?.properties?.showArrows !== false;
 
       // Calculate distance if polyline
       let distanceText = '';
@@ -271,6 +377,29 @@ export function RouteMap({
             </button>
           </div>
         </div>
+
+        ${
+          isPolyline
+            ? `
+        <div class="popup-direction-section">
+          <div class="popup-direction-header">
+            <span class="popup-direction-label">Směr chůze:</span>
+            <span class="popup-direction-badge ${layerArrowsActive ? 'active' : 'inactive'}">
+              ${layerArrowsActive ? 'Šipky zapnuty' : 'Šipky skryty'}
+            </span>
+          </div>
+          <div class="popup-direction-actions">
+            <button type="button" class="popup-dir-btn popup-dir-toggle-btn" title="Zapnout nebo skrýt šipky na této trase">
+              ${layerArrowsActive ? 'Skrýt šipky' : 'Zobrazit šipky'}
+            </button>
+            <button type="button" class="popup-dir-btn popup-dir-reverse-btn" title="Obrátit směr chůze a orientaci šipek">
+              ⇄ Obrátit směr
+            </button>
+          </div>
+        </div>
+        `
+            : ''
+        }
 
         <div class="popup-instruction">Barva / typ:</div>
         <div class="popup-buttons-grid"></div>
@@ -333,6 +462,42 @@ export function RouteMap({
         }
       }
 
+      if (isPolyline) {
+        const toggleBtn = container.querySelector('.popup-dir-toggle-btn') as HTMLButtonElement | null;
+        const reverseBtn = container.querySelector('.popup-dir-reverse-btn') as HTMLButtonElement | null;
+        const dirBadge = container.querySelector('.popup-direction-badge') as HTMLElement | null;
+
+        if (toggleBtn) {
+          toggleBtn.addEventListener('click', () => {
+            const currentVal = layer.feature?.properties?.showArrows !== false;
+            const newVal = !currentVal;
+            layer.feature = layer.feature || { type: 'Feature', properties: {} };
+            layer.feature.properties = {
+              ...(layer.feature.properties || {}),
+              showArrows: newVal,
+            };
+            updateLayerArrows(layer);
+            syncLayers();
+
+            toggleBtn.textContent = newVal ? 'Skrýt šipky' : 'Zobrazit šipky';
+            if (dirBadge) {
+              dirBadge.textContent = newVal ? 'Šipky zapnuty' : 'Šipky skryty';
+              dirBadge.className = `popup-direction-badge ${newVal ? 'active' : 'inactive'}`;
+            }
+          });
+        }
+
+        if (reverseBtn) {
+          reverseBtn.addEventListener('click', () => {
+            reversePolylineDirection(layer);
+            reverseBtn.textContent = 'Obráceno ✓';
+            setTimeout(() => {
+              if (reverseBtn) reverseBtn.textContent = '⇄ Obrátit směr';
+            }, 1000);
+          });
+        }
+      }
+
       const grid = container.querySelector('.popup-buttons-grid');
       if (grid) {
         const list = categoriesRef.current || ROUTE_CATEGORIES;
@@ -355,21 +520,34 @@ export function RouteMap({
 
       return container;
     },
-    [syncLayers, updateLayerCategory]
+    [syncLayers, updateLayerCategory, updateLayerArrows, reversePolylineDirection]
   );
 
   const bindLayerEvents = useCallback(
     function attachEvents(layer: L.Layer) {
-      layer.on('pm:edit', syncLayers);
-      layer.on('pm:dragend', syncLayers);
+      layer.on('pm:edit', () => {
+        updateLayerArrows(layer);
+        syncLayers();
+      });
+      layer.on('pm:dragend', () => {
+        updateLayerArrows(layer);
+        syncLayers();
+      });
       layer.on('pm:cut', (e: any) => {
         if (e.layer && drawnItemsRef.current) {
           drawnItemsRef.current.addLayer(e.layer);
           attachEvents(e.layer);
+          updateLayerArrows(e.layer);
         }
+        updateLayerArrows(layer);
         syncLayers();
       });
       layer.on('remove', () => {
+        const oldGroup = arrowLayersMapRef.current.get(layer);
+        if (oldGroup && arrowsContainerRef.current) {
+          arrowsContainerRef.current.removeLayer(oldGroup);
+          arrowLayersMapRef.current.delete(layer);
+        }
         if (drawnItemsRef.current?.hasLayer(layer)) {
           drawnItemsRef.current.removeLayer(layer);
         }
@@ -382,7 +560,7 @@ export function RouteMap({
         maxWidth: 290,
       });
     },
-    [syncLayers, createLayerPopupContent]
+    [syncLayers, createLayerPopupContent, updateLayerArrows]
   );
 
   const initialTileProviderRef = useRef(tileProviderId);
@@ -413,6 +591,11 @@ export function RouteMap({
     const drawnItems = new L.FeatureGroup();
     map.addLayer(drawnItems);
     drawnItemsRef.current = drawnItems;
+
+    // LayerGroup holding all directional arrows (rendered on top of routes)
+    const arrowsContainer = new L.LayerGroup().addTo(map);
+    arrowsContainerRef.current = arrowsContainer;
+    const arrowLayersMap = arrowLayersMapRef.current;
 
     // Configure Geoman controls
     map.pm.addControls({
@@ -477,6 +660,7 @@ export function RouteMap({
 
         drawnItems.addLayer(layer);
         bindLayerEvents(layer);
+        updateLayerArrows(layer);
         syncLayers();
 
         // If it's a marker/point, auto-open popup for instant naming
@@ -535,6 +719,7 @@ export function RouteMap({
             }
             drawnItems.addLayer(layer);
             bindLayerEvents(layer);
+            updateLayerArrows(layer);
           },
         });
 
@@ -558,12 +743,15 @@ export function RouteMap({
       map.pm.removeControls();
       map.off();
       drawnItems.clearLayers();
+      arrowsContainer.clearLayers();
+      arrowLayersMap.clear();
       map.remove();
       mapInstanceRef.current = null;
       drawnItemsRef.current = null;
+      arrowsContainerRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [bindLayerEvents, syncLayers]);
+  }, [bindLayerEvents, syncLayers, updateLayerArrows]);
 
   // Update Geoman path drawing styles whenever activeCategory changes
   useEffect(() => {
@@ -634,6 +822,7 @@ export function RouteMap({
           }
           drawnItemsRef.current?.addLayer(layer);
           bindLayerEvents(layer);
+          updateLayerArrows(layer);
         },
       });
 
@@ -646,12 +835,14 @@ export function RouteMap({
     } catch (err) {
       console.error('Failed to render imported GeoJSON:', err);
     }
-  }, [importGeoJsonData, bindLayerEvents, syncLayers]);
+  }, [importGeoJsonData, bindLayerEvents, syncLayers, updateLayerArrows]);
 
   // Handle clearing all layers
   useEffect(() => {
     if (clearTrigger === 0 || !drawnItemsRef.current) return;
     drawnItemsRef.current.clearLayers();
+    arrowsContainerRef.current?.clearLayers();
+    arrowLayersMapRef.current.clear();
     syncLayers();
   }, [clearTrigger, syncLayers]);
 
@@ -739,7 +930,7 @@ export function RouteMap({
           aria-label="Přepnout mapový podklad"
         >
           <div className="basemap-icon-wrapper">
-            {tileProviderId === 'satellite' ? <Satellite size={18} /> : <Map size={18} />}
+            {tileProviderId === 'satellite' ? <Satellite size={18} /> : <MapIcon size={18} />}
           </div>
           <span className="basemap-label">
             {tileProviderId === 'satellite' ? 'Satelit' : 'Standard'}
@@ -748,6 +939,32 @@ export function RouteMap({
         </button>
         <div className="basemap-tooltip">
           {tileProviderId === 'satellite' ? 'Přepnout na Standard' : 'Přepnout na Satelit'}
+        </div>
+      </div>
+
+      {/* Floating Direction Arrows Toggle Button (Placed right below basemap toggle) */}
+      <div className="arrows-floating-toggle-container">
+        <button
+          type="button"
+          className={`arrows-toggle-btn ${showGlobalArrows ? 'is-active' : 'is-inactive'}`}
+          onClick={toggleGlobalArrows}
+          title={
+            showGlobalArrows
+              ? 'Směrové šipky jsou zapnuté — Kliknutím je skryjete na celé mapě'
+              : 'Směrové šipky jsou skryté — Kliknutím je zobrazíte'
+          }
+          aria-label="Přepnout směrové šipky na trasách"
+        >
+          <div className="arrows-icon-wrapper">
+            <Navigation size={18} />
+          </div>
+          <span className="arrows-btn-label">
+            {showGlobalArrows ? 'Šipky Zap' : 'Šipky Vyp'}
+          </span>
+          <div className={`arrows-indicator-dot ${showGlobalArrows ? 'is-active' : ''}`} />
+        </button>
+        <div className="arrows-tooltip">
+          {showGlobalArrows ? 'Skrýt šipky směru' : 'Zobrazit šipky směru'}
         </div>
       </div>
 

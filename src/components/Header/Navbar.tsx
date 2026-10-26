@@ -67,7 +67,6 @@ export function Navbar({
           onClick={onOpenMapsModal}
           title="Kliknutím otevřít správu uložených map"
         >
-          <span className="status-dot" />
           <span className="status-map-name">{activeMapName}</span>
         </button>
       </div>

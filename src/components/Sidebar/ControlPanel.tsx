@@ -1,13 +1,5 @@
 import { useState } from 'react';
-import {
-  Layers,
-  Activity,
-  ChevronLeft,
-  ChevronRight,
-  Route,
-  MapPin,
-  Pentagon,
-} from 'lucide-react';
+import { Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { RouteStats } from '../../types/route';
 
 interface ControlPanelProps {
@@ -40,7 +32,6 @@ export function ControlPanel({ stats }: ControlPanelProps) {
           <div className="stats-hero-card">
             <div className="stats-hero-top">
               <span className="stats-hero-label">Celková délka</span>
-              <span className="stats-hero-badge">Aktivní trasa</span>
             </div>
             <div className="stats-hero-value-wrap">
               <span className="stats-hero-num">{stats.totalDistanceKm}</span>
@@ -49,40 +40,6 @@ export function ControlPanel({ stats }: ControlPanelProps) {
             <span className="stats-hero-sub">
               ≈ {(stats.totalDistanceKm * 0.621371).toFixed(2)} mi
             </span>
-          </div>
-
-          <div className="stats-mini-grid">
-            <div className="mini-stat-card">
-              <div className="mini-stat-header">
-                <Layers size={13} />
-                <span>Celkem prvků</span>
-              </div>
-              <span className="mini-stat-num">{stats.featureCount}</span>
-            </div>
-
-            <div className="mini-stat-card">
-              <div className="mini-stat-header">
-                <Route size={13} />
-                <span>Úseky</span>
-              </div>
-              <span className="mini-stat-num">{stats.lineCount}</span>
-            </div>
-
-            <div className="mini-stat-card">
-              <div className="mini-stat-header">
-                <Pentagon size={13} />
-                <span>Polygony</span>
-              </div>
-              <span className="mini-stat-num">{stats.polygonCount}</span>
-            </div>
-
-            <div className="mini-stat-card">
-              <div className="mini-stat-header">
-                <MapPin size={13} />
-                <span>Značky</span>
-              </div>
-              <span className="mini-stat-num">{stats.markerCount}</span>
-            </div>
           </div>
         </div>
       </div>
