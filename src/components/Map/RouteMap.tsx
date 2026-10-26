@@ -92,9 +92,9 @@ interface RouteMapProps {
   onActiveCategoryChange: (cat: RouteCategory) => void;
   categories: RouteCategory[];
   activeCategoryIds: string[];
-  onAddCategory: (id: string) => void;
-  onRemoveCategory: (id: string) => void;
-  onRenameCategory: (id: string, newName: string) => void;
+  onAddCategory?: (id: string) => void;
+  onRemoveCategory?: (id: string) => void;
+  onRenameCategory?: (id: string, newName: string) => void;
 }
 
 export function RouteMap({
@@ -1110,93 +1110,78 @@ export function RouteMap({
     <div className="map-wrapper" id="route-map-container">
       <div ref={mapContainerRef} className="leaflet-container-view" id="leaflet-map" />
 
-      {/* Floating Active Category Bar */}
-      <RouteColorsBar
-        categories={categories}
-        activeCategoryIds={activeCategoryIds}
-        activeCategory={activeCategory}
-        onSelectCategory={onActiveCategoryChange}
-        onRenameCategory={onRenameCategory}
-        onAddCategory={onAddCategory}
-        onRemoveCategory={onRemoveCategory}
-      />
-
-      {/* Floating Basemap Toggle Button (Placed to the left beside the panel) */}
-      <div className="basemap-floating-toggle-container">
-        <button
-          type="button"
-          className={`basemap-toggle-btn ${tileProviderId === 'satellite' ? 'is-satellite' : 'is-osm'}`}
-          onClick={() => onTileSelect(tileProviderId === 'satellite' ? 'osm' : 'satellite')}
-          title={
-            tileProviderId === 'satellite'
-              ? 'Aktivní: Esri Satelit — Kliknutím přepnete na Standardní mapu'
-              : 'Aktivní: Standardní mapa — Kliknutím přepnete na Satelit'
-          }
-          aria-label="Přepnout mapový podklad"
-        >
-          <div className="basemap-icon-wrapper">
-            {tileProviderId === 'satellite' ? <Satellite size={18} /> : <MapIcon size={18} />}
+      {/* Unified Left Column Tools (Identical 34x34 size & style matching Geoman) */}
+      <div className="left-tools-column" id="left-tools-column">
+        {/* Basemap Toggle */}
+        <div className="left-tool-item">
+          <button
+            type="button"
+            className={`left-tool-btn ${tileProviderId === 'satellite' ? 'is-active' : ''}`}
+            onClick={() => onTileSelect(tileProviderId === 'satellite' ? 'osm' : 'satellite')}
+            title={
+              tileProviderId === 'satellite'
+                ? 'Aktivní: Satelit — Kliknutím přepnete na Standardní mapu'
+                : 'Aktivní: Standardní mapa — Kliknutím přepnete na Satelit'
+            }
+            aria-label="Přepnout mapový podklad"
+          >
+            {tileProviderId === 'satellite' ? <Satellite size={17} /> : <MapIcon size={17} />}
+          </button>
+          <div className="left-tool-tooltip">
+            {tileProviderId === 'satellite' ? 'Satelitní mapa' : 'Standardní mapa'}
           </div>
-          <span className="basemap-label">
-            {tileProviderId === 'satellite' ? 'Satelit' : 'Standard'}
-          </span>
-          <div className="basemap-indicator-dot" />
-        </button>
-        <div className="basemap-tooltip">
-          {tileProviderId === 'satellite' ? 'Přepnout na Standard' : 'Přepnout na Satelit'}
         </div>
-      </div>
 
-      {/* Floating Direction Arrows Toggle Button (Placed right below basemap toggle) */}
-      <div className="arrows-floating-toggle-container">
-        <button
-          type="button"
-          className={`arrows-toggle-btn ${showGlobalArrows ? 'is-active' : 'is-inactive'}`}
-          onClick={toggleGlobalArrows}
-          title={
-            showGlobalArrows
-              ? 'Směrové šipky jsou zapnuté — Kliknutím je skryjete na celé mapě'
-              : 'Směrové šipky jsou skryté — Kliknutím je zobrazíte'
-          }
-          aria-label="Přepnout směrové šipky na trasách"
-        >
-          <div className="arrows-icon-wrapper">
-            <Navigation size={18} />
+        {/* Direction Arrows Toggle */}
+        <div className="left-tool-item">
+          <button
+            type="button"
+            className={`left-tool-btn ${showGlobalArrows ? 'is-active' : ''}`}
+            onClick={toggleGlobalArrows}
+            title={
+              showGlobalArrows
+                ? 'Směrové šipky: Zapnuty — Kliknutím je skryjete na celé mapě'
+                : 'Směrové šipky: Vypnuty — Kliknutím je zobrazíte'
+            }
+            aria-label="Přepnout směrové šipky na trasách"
+          >
+            <Navigation size={17} />
+          </button>
+          <div className="left-tool-tooltip">
+            {showGlobalArrows ? 'Šipky směru: Zapnuty' : 'Šipky směru: Vypnuty'}
           </div>
-          <span className="arrows-btn-label">
-            {showGlobalArrows ? 'Šipky Zap' : 'Šipky Vyp'}
-          </span>
-          <div className={`arrows-indicator-dot ${showGlobalArrows ? 'is-active' : ''}`} />
-        </button>
-        <div className="arrows-tooltip">
-          {showGlobalArrows ? 'Skrýt šipky směru' : 'Zobrazit šipky směru'}
         </div>
-      </div>
 
-      {/* Floating Add Point into Route Tool Button (Placed right below arrows toggle) */}
-      <div className="add-point-floating-toggle-container">
-        <button
-          type="button"
-          className={`add-point-toggle-btn ${isAddPointMode ? 'is-active' : 'is-inactive'}`}
-          onClick={() => setIsAddPointMode((prev) => !prev)}
-          title={
-            isAddPointMode
-              ? 'Režim vkládání bodů je aktivní — Kliknutím ukončíte'
-              : 'Nástroj: Přidat bod do existující trasy'
-          }
-          aria-label="Nástroj přidat bod do trasy"
-        >
-          <div className="add-point-icon-wrapper">
-            <MapPinPlus size={18} />
+        {/* Add Point Mode Toggle */}
+        <div className="left-tool-item">
+          <button
+            type="button"
+            className={`left-tool-btn ${isAddPointMode ? 'is-active' : ''}`}
+            onClick={() => setIsAddPointMode((prev) => !prev)}
+            title={
+              isAddPointMode
+                ? 'Režim vkládání bodů je aktivní — Kliknutím ukončíte'
+                : 'Nástroj: Přidat bod do existující trasy'
+            }
+            aria-label="Nástroj přidat bod do trasy"
+          >
+            <MapPinPlus size={17} />
+          </button>
+          <div className="left-tool-tooltip">
+            {isAddPointMode ? 'Ukončit vkládání bodů' : 'Přidat bod do trasy'}
           </div>
-          <span className="add-point-btn-label">
-            {isAddPointMode ? 'Aktivní' : '+ Bod'}
-          </span>
-          <div className={`add-point-indicator-dot ${isAddPointMode ? 'is-active' : ''}`} />
-        </button>
-        <div className="add-point-tooltip">
-          {isAddPointMode ? 'Ukončit vkládání bodů' : 'Přidat bod do trasy'}
         </div>
+
+        {/* Drawing Colors & Add Color */}
+        <RouteColorsBar
+          categories={categories}
+          activeCategoryIds={activeCategoryIds}
+          activeCategory={activeCategory}
+          onSelectCategory={onActiveCategoryChange}
+          onRenameCategory={onRenameCategory}
+          onAddCategory={onAddCategory}
+          onRemoveCategory={onRemoveCategory}
+        />
       </div>
 
       {/* Floating Top Banner when Add Point Mode is Active */}
