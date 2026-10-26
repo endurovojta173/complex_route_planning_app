@@ -119,6 +119,11 @@ export function RouteMap({
         const color = layer.options?.color || layer.feature?.properties?.color || DEFAULT_CATEGORY.color;
         const fillColor = layer.options?.fillColor || layer.feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
 
+        const name =
+          layer.feature?.properties?.name !== undefined
+            ? layer.feature.properties.name
+            : geo.properties?.name || '';
+
         if (geo.type === 'Feature') {
           geo.properties = {
             ...(geo.properties || {}),
@@ -129,6 +134,11 @@ export function RouteMap({
             stroke: color,
             'stroke-width': 4,
           };
+          if (name) {
+            geo.properties.name = name;
+          } else if (geo.properties && 'name' in geo.properties) {
+            delete geo.properties.name;
+          }
           features.push(geo);
         } else if (geo.type === 'FeatureCollection') {
           for (const feat of geo.features) {
@@ -141,6 +151,11 @@ export function RouteMap({
               stroke: color,
               'stroke-width': 4,
             };
+            if (name) {
+              feat.properties.name = name;
+            } else if (feat.properties && 'name' in feat.properties) {
+              delete feat.properties.name;
+            }
             features.push(feat);
           }
         }
@@ -204,6 +219,11 @@ export function RouteMap({
         currentCat = getCategoryByColor(currentColor, categoriesRef.current);
       }
 
+      const isMarker = typeof layer.getLatLng === 'function' && typeof layer.getLatLngs !== 'function';
+      const isPolygon = typeof layer.getLatLngs === 'function' && layer.pm?.getShape?.() === 'Polygon';
+      const typeLabel = isMarker ? 'Bod' : isPolygon ? 'Polygon' : 'Úsek';
+      const currentName = layer.feature?.properties?.name || '';
+
       // Calculate distance if polyline
       let distanceText = '';
       if (typeof layer.getLatLngs === 'function') {
@@ -230,11 +250,88 @@ export function RouteMap({
             <span class="popup-dot" style="background-color: ${currentCat.color};"></span>
             ${currentCat.name}
           </span>
+          <span class="popup-type-badge">${typeLabel}</span>
           ${distanceText ? `<span class="popup-dist-badge">${distanceText}</span>` : ''}
         </div>
-        <div class="popup-instruction">Vyberte novou barvu / typ úseku:</div>
+
+        <div class="popup-name-section">
+          <label class="popup-name-label" for="layer-name-input">
+            ${isMarker ? 'Název bodu:' : 'Název prvku:'}
+          </label>
+          <div class="popup-name-row">
+            <input
+              type="text"
+              id="layer-name-input"
+              class="popup-name-input"
+              placeholder="${isMarker ? 'Např. Start, Cíl, Občerstvení...' : 'Zadejte název...'}"
+              maxlength="40"
+            />
+            <button type="button" class="popup-name-save-btn" title="Uložit název (Enter)">
+              Uložit
+            </button>
+          </div>
+        </div>
+
+        <div class="popup-instruction">Barva / typ:</div>
         <div class="popup-buttons-grid"></div>
       `;
+
+      const nameInput = container.querySelector('.popup-name-input') as HTMLInputElement | null;
+      const saveBtn = container.querySelector('.popup-name-save-btn') as HTMLButtonElement | null;
+
+      if (nameInput) {
+        nameInput.value = currentName;
+
+        const applyName = () => {
+          const newName = nameInput.value.trim();
+          layer.feature = layer.feature || { type: 'Feature', properties: {} };
+          layer.feature.properties = {
+            ...(layer.feature.properties || {}),
+            name: newName,
+          };
+
+          if (newName) {
+            layer.unbindTooltip();
+            layer.bindTooltip(newName, {
+              permanent: true,
+              direction: 'top',
+              offset: isMarker ? [0, -14] : [0, 0],
+              className: 'point-name-tooltip',
+            });
+          } else {
+            layer.unbindTooltip();
+          }
+
+          syncLayers();
+        };
+
+        nameInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            applyName();
+            if (saveBtn) {
+              saveBtn.textContent = 'Uloženo ✓';
+              setTimeout(() => {
+                if (saveBtn) saveBtn.textContent = 'Uložit';
+              }, 1200);
+            }
+          }
+        });
+
+        nameInput.addEventListener('change', () => {
+          applyName();
+        });
+
+        if (saveBtn) {
+          saveBtn.addEventListener('click', () => {
+            applyName();
+            saveBtn.textContent = 'Uloženo ✓';
+            setTimeout(() => {
+              if (saveBtn) saveBtn.textContent = 'Uložit';
+            }, 1200);
+          });
+        }
+      }
 
       const grid = container.querySelector('.popup-buttons-grid');
       if (grid) {
@@ -258,7 +355,7 @@ export function RouteMap({
 
       return container;
     },
-    [updateLayerCategory]
+    [syncLayers, updateLayerCategory]
   );
 
   const bindLayerEvents = useCallback(
@@ -381,6 +478,15 @@ export function RouteMap({
         drawnItems.addLayer(layer);
         bindLayerEvents(layer);
         syncLayers();
+
+        // If it's a marker/point, auto-open popup for instant naming
+        if (layer instanceof L.Marker || e.shape === 'Marker') {
+          setTimeout(() => {
+            layer.openPopup();
+            const input = document.getElementById('layer-name-input') as HTMLInputElement | null;
+            if (input) input.focus();
+          }, 80);
+        }
       }
     };
 
@@ -417,6 +523,15 @@ export function RouteMap({
               const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
               const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
               (layer as any).setStyle({ color: col, fillColor: fillCol });
+            }
+            if (feature.properties?.name) {
+              const isPt = feature.geometry?.type === 'Point' || layer instanceof L.Marker;
+              layer.bindTooltip(feature.properties.name, {
+                permanent: true,
+                direction: 'top',
+                offset: isPt ? [0, -14] : [0, 0],
+                className: 'point-name-tooltip',
+              });
             }
             drawnItems.addLayer(layer);
             bindLayerEvents(layer);
@@ -507,6 +622,15 @@ export function RouteMap({
             const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
             const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
             (layer as any).setStyle({ color: col, fillColor: fillCol });
+          }
+          if (feature.properties?.name) {
+            const isPt = feature.geometry?.type === 'Point' || layer instanceof L.Marker;
+            layer.bindTooltip(feature.properties.name, {
+              permanent: true,
+              direction: 'top',
+              offset: isPt ? [0, -14] : [0, 0],
+              className: 'point-name-tooltip',
+            });
           }
           drawnItemsRef.current?.addLayer(layer);
           bindLayerEvents(layer);
