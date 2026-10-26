@@ -69,13 +69,16 @@ export function ControlPanel({
           </div>
 
           <div className="stats-hero-card">
-            <span className="stats-hero-label">Celková délka</span>
+            <div className="stats-hero-top">
+              <span className="stats-hero-label">Celková délka</span>
+              <span className="stats-hero-badge">Aktivní trasa</span>
+            </div>
             <div className="stats-hero-value-wrap">
               <span className="stats-hero-num">{stats.totalDistanceKm}</span>
               <span className="stats-hero-unit">km</span>
             </div>
             <span className="stats-hero-sub">
-              ({(stats.totalDistanceKm * 0.621371).toFixed(2)} mi)
+              ≈ {(stats.totalDistanceKm * 0.621371).toFixed(2)} mi
             </span>
           </div>
 
