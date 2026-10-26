@@ -263,13 +263,7 @@ export default function App() {
       />
 
       <main className="main-content">
-        <ControlPanel
-          stats={stats}
-          activeCategory={activeCategory}
-          onSelectCategory={setActiveCategory}
-          categories={categories}
-          onRenameCategory={handleRenameCategory}
-        />
+        <ControlPanel stats={stats} />
 
         <RouteMap
           tileProviderId={currentTileId}

@@ -7,41 +7,15 @@ import {
   Route,
   MapPin,
   Pentagon,
-  Palette,
-  Check,
-  Pencil,
-  X,
 } from 'lucide-react';
-import type { RouteStats, RouteCategory } from '../../types/route';
+import type { RouteStats } from '../../types/route';
 
 interface ControlPanelProps {
   stats: RouteStats;
-  activeCategory: RouteCategory;
-  onSelectCategory: (category: RouteCategory) => void;
-  categories: RouteCategory[];
-  onRenameCategory: (id: string, newName: string) => void;
 }
 
-export function ControlPanel({
-  stats,
-  activeCategory,
-  onSelectCategory,
-  categories,
-  onRenameCategory,
-}: ControlPanelProps) {
+export function ControlPanel({ stats }: ControlPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editingCatName, setEditingCatName] = useState('');
-
-  const handleStartRename = (cat: RouteCategory) => {
-    setEditingCatId(cat.id);
-    setEditingCatName(cat.name);
-  };
-
-  const handleSaveRename = (catId: string) => {
-    onRenameCategory(catId, editingCatName);
-    setEditingCatId(null);
-  };
 
   return (
     <aside className={`control-panel ${isCollapsed ? 'collapsed' : ''}`} id="control-sidebar">
@@ -109,120 +83,6 @@ export function ControlPanel({
               </div>
               <span className="mini-stat-num">{stats.markerCount}</span>
             </div>
-          </div>
-        </div>
-
-        {/* Section: Route Colors & Names */}
-        <div className="panel-section">
-          <div className="section-title">
-            <Palette size={16} className="title-icon" />
-            <span>Barvy a názvy tras</span>
-          </div>
-          <div className="categories-list">
-            {categories.map((cat) => {
-              const stat = stats.categoryStats?.find((s) => s.categoryId === cat.id);
-              const isActive = cat.id === activeCategory.id;
-              const hasDistance = Boolean(stat && stat.distanceKm > 0);
-              const hasCount = Boolean(stat && stat.count > 0);
-              const isEditing = editingCatId === cat.id;
-
-              if (isEditing) {
-                return (
-                  <div
-                    key={cat.id}
-                    className="category-item-edit-box"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <span
-                      className="category-color-dot"
-                      style={{ backgroundColor: cat.color }}
-                    />
-                    <input
-                      type="text"
-                      className="category-rename-input"
-                      value={editingCatName}
-                      onChange={(e) => setEditingCatName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleSaveRename(cat.id);
-                        if (e.key === 'Escape') setEditingCatId(null);
-                      }}
-                      autoFocus
-                      maxLength={30}
-                      placeholder={cat.baseColorName}
-                    />
-                    <button
-                      type="button"
-                      className="cat-edit-action-btn confirm"
-                      onClick={() => handleSaveRename(cat.id)}
-                      title="Uložit název (Enter)"
-                    >
-                      <Check size={13} />
-                    </button>
-                    <button
-                      type="button"
-                      className="cat-edit-action-btn cancel"
-                      onClick={() => setEditingCatId(null)}
-                      title="Zrušit (Esc)"
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={cat.id}
-                  className={`category-item-btn ${isActive ? 'active' : ''}`}
-                  onClick={() => onSelectCategory(cat)}
-                  title={`${cat.description} — kliknutím vybrat pro kreslení`}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') onSelectCategory(cat);
-                  }}
-                >
-                  <div className="category-item-main">
-                    <span
-                      className="category-color-dot"
-                      style={{ backgroundColor: cat.color }}
-                    />
-                    <div className="category-text-col">
-                      <div className="category-name-row">
-                        <span className="category-name">{cat.name}</span>
-                        {isActive && <Check size={12} className="category-active-check" />}
-                        <button
-                          type="button"
-                          className="category-rename-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartRename(cat);
-                          }}
-                          title={`Přejmenovat barvu ${cat.name}`}
-                        >
-                          <Pencil size={11} />
-                        </button>
-                      </div>
-                      <span className="category-desc">{cat.description}</span>
-                    </div>
-                  </div>
-
-                  <div className="category-stats-col">
-                    {hasDistance ? (
-                      <span className="category-dist-badge" style={{ color: cat.color }}>
-                        {stat!.distanceKm} km
-                      </span>
-                    ) : hasCount ? (
-                      <span className="category-count-badge">
-                        {stat!.count} {stat!.count === 1 ? 'prvek' : 'prvků'}
-                      </span>
-                    ) : (
-                      <span className="category-empty-dash">-</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       </div>
