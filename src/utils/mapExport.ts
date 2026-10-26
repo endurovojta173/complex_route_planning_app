@@ -116,43 +116,86 @@ function drawDirectionArrow(
   ctx.translate(x, y);
   ctx.rotate((bearing * Math.PI) / 180);
 
-  // Subtle dark drop shadow
+  // Strong dark drop shadow for maximum depth
   ctx.shadowColor = 'rgba(0, 0, 0, 0.75)';
-  ctx.shadowBlur = 3;
-  ctx.shadowOffsetY = 1;
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1.5;
 
-  ctx.beginPath();
   if (bidirectional) {
-    // Symmetrical double-ended arrowhead centered at (0, 0)
-    ctx.moveTo(0, -10);
-    ctx.lineTo(5.5, -4.5);
-    ctx.lineTo(1.8, -5.5);
-    ctx.lineTo(1.8, 5.5);
-    ctx.lineTo(5.5, 4.5);
-    ctx.lineTo(0, 10);
-    ctx.lineTo(-5.5, 4.5);
-    ctx.lineTo(-1.8, 5.5);
-    ctx.lineTo(-1.8, -5.5);
-    ctx.lineTo(-5.5, -4.5);
+    // 1. Crisp white double-arrow body
+    ctx.beginPath();
+    ctx.moveTo(0, -11.5);
+    ctx.lineTo(7, -4.5);
+    ctx.lineTo(2, -5.5);
+    ctx.lineTo(2, 5.5);
+    ctx.lineTo(7, 4.5);
+    ctx.lineTo(0, 11.5);
+    ctx.lineTo(-7, 4.5);
+    ctx.lineTo(-2, 5.5);
+    ctx.lineTo(-2, -5.5);
+    ctx.lineTo(-7, -4.5);
     ctx.closePath();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Dark high-contrast stroke
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // 2. Inner route-colored core
+    ctx.beginPath();
+    ctx.moveTo(0, -8.5);
+    ctx.lineTo(4, -4.5);
+    ctx.lineTo(0.8, -5.2);
+    ctx.lineTo(0.8, 5.2);
+    ctx.lineTo(4, 4.5);
+    ctx.lineTo(0, 8.5);
+    ctx.lineTo(-4, 4.5);
+    ctx.lineTo(-0.8, 5.2);
+    ctx.lineTo(-0.8, -5.2);
+    ctx.lineTo(-4, -4.5);
+    ctx.closePath();
+
+    ctx.fillStyle = color;
+    ctx.fill();
   } else {
-    // Single arrowhead path: tip pointing North/Up (0 deg)
-    ctx.moveTo(0, -9);
-    ctx.lineTo(7.5, 3.5);
-    ctx.lineTo(0, 0);
-    ctx.lineTo(-7.5, 3.5);
+    // 1. Crisp white aerodynamic single arrow body
+    ctx.beginPath();
+    ctx.moveTo(0, -10);
+    ctx.lineTo(8.5, 3.5);
+    ctx.lineTo(2.5, 1);
+    ctx.lineTo(0, -2);
+    ctx.lineTo(-2.5, 1);
+    ctx.lineTo(-8.5, 3.5);
     ctx.closePath();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
+    // Dark high-contrast stroke
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1.8;
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // 2. Inner route-colored core
+    ctx.beginPath();
+    ctx.moveTo(0, -7);
+    ctx.lineTo(5.5, 2);
+    ctx.lineTo(1.5, 0.3);
+    ctx.lineTo(0, -1.5);
+    ctx.lineTo(-1.5, 0.3);
+    ctx.lineTo(-5.5, 2);
+    ctx.closePath();
+
+    ctx.fillStyle = color;
+    ctx.fill();
   }
-
-  ctx.fillStyle = color;
-  ctx.fill();
-
-  // Reset shadow for crisp white stroke
-  ctx.shadowColor = 'transparent';
-  ctx.lineWidth = 1.6;
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineJoin = 'round';
-  ctx.stroke();
 
   ctx.restore();
 }
@@ -649,12 +692,14 @@ export function exportMapToSvg(
     if (arrow.bidirectional) {
       arrowsSvg += `
       <g transform="translate(${arrow.pos.x.toFixed(1)}, ${arrow.pos.y.toFixed(1)}) rotate(${arrow.bearing.toFixed(1)})">
-        <path d="M 0 -10 L 5.5 -4.5 L 1.8 -5.5 L 1.8 5.5 L 5.5 4.5 L 0 10 L -5.5 4.5 L -1.8 5.5 L -1.8 -5.5 L -5.5 -4.5 Z" fill="${arrow.color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M 0 -11.5 L 7 -4.5 L 2 -5.5 L 2 5.5 L 7 4.5 L 0 11.5 L -7 4.5 L -2 5.5 L -2 -5.5 L -7 -4.5 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.8" stroke-linejoin="round" />
+        <path d="M 0 -8.5 L 4 -4.5 L 0.8 -5.2 L 0.8 5.2 L 4 4.5 L 0 8.5 L -4 4.5 L -0.8 5.2 L -0.8 -5.2 L -4 -4.5 Z" fill="${arrow.color}" />
       </g>`;
     } else {
       arrowsSvg += `
       <g transform="translate(${arrow.pos.x.toFixed(1)}, ${arrow.pos.y.toFixed(1)}) rotate(${arrow.bearing.toFixed(1)})">
-        <path d="M 0 -9 L 7.5 3.5 L 0 0 L -7.5 3.5 Z" fill="${arrow.color}" stroke="#ffffff" stroke-width="1.6" stroke-linejoin="round" />
+        <path d="M 0 -10 L 8.5 3.5 L 2.5 1 L 0 -2 L -2.5 1 L -8.5 3.5 Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.8" stroke-linejoin="round" />
+        <path d="M 0 -7 L 5.5 2 L 1.5 0.3 L 0 -1.5 L -1.5 0.3 L -5.5 2 Z" fill="${arrow.color}" />
       </g>`;
     }
   }
