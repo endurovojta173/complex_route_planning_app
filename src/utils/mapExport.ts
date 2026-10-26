@@ -538,11 +538,45 @@ export async function exportMapToPdf(
   const canvas = await renderMapToCanvas(mapContainer, { scale: 1.5 });
   const pdfBlob = await createMapPdfBlob(canvas, options);
   const cleanName = (options.title || 'mapa_trasy')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/\s+/g, '_')
     .replace(/[^a-z0-9_-]/g, '');
 
   downloadBlob(pdfBlob, `${cleanName || 'mapa'}.pdf`);
+}
+
+/**
+ * Exports the active map view with routes, directional arrows, and compass
+ * directly as a high-resolution PNG image file and triggers download
+ */
+export async function exportMapToPng(
+  mapContainer: HTMLElement,
+  title: string,
+  options?: { scale?: number }
+): Promise<void> {
+  const scale = options?.scale || 2; // High-resolution 2x canvas
+  const canvas = await renderMapToCanvas(mapContainer, { scale });
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (b) => {
+        if (b) resolve(b);
+        else reject(new Error('Canvas toBlob failed to produce PNG'));
+      },
+      'image/png'
+    );
+  });
+
+  const cleanName = (title || 'mapa_trasy')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_-]/g, '');
+
+  downloadBlob(blob, `${cleanName || 'mapa'}.png`);
 }
 
 /**
@@ -614,6 +648,8 @@ ${routesSvg}  </g>
 
   const blob = new Blob([svgDoc], { type: 'image/svg+xml;charset=utf-8' });
   const cleanName = (title || 'mapa_trasy')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/\s+/g, '_')
     .replace(/[^a-z0-9_-]/g, '');

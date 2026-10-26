@@ -1992,6 +1992,12 @@
   border: 1px solid rgba(46, 189, 127, 0.3);
 }
 
+.export-card-icon-wrap.png {
+  color: #a855f7;
+  background: rgba(168, 85, 247, 0.14);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
 .export-card-icon-wrap.svg {
   color: #38bdf8;
   background: rgba(56, 189, 248, 0.14);
@@ -2129,8 +2135,14 @@
 
 .export-secondary-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+}
+
+@media (max-width: 600px) {
+  .export-secondary-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .secondary-export-card {

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { X, FileText, Image as ImageIcon, HardDriveDownload, Printer, Loader2 } from 'lucide-react';
+import { X, FileText, Image as ImageIcon, HardDriveDownload, Printer, Loader2, FileCode2 } from 'lucide-react';
 import type { RouteCategory, RouteStats } from '../../types/route';
-import { exportMapToPdf, exportMapToSvg } from '../../utils/mapExport';
+import { exportMapToPdf, exportMapToPng, exportMapToSvg } from '../../utils/mapExport';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ export function ExportModal({
   const [includeStats, setIncludeStats] = useState(true);
   const [includeLegend, setIncludeLegend] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingPng, setIsExportingPng] = useState(false);
 
   if (!isOpen) return null;
 
@@ -53,6 +54,26 @@ export function ExportModal({
       onShowNotification('Chyba při generování PDF mapy.');
     } finally {
       setIsExportingPdf(false);
+    }
+  };
+
+  const handlePngExport = async () => {
+    const mapContainer = document.querySelector('.leaflet-container') as HTMLElement | null;
+    if (!mapContainer) {
+      onShowNotification('Chyba: Mapový kontejner nebyl nalezen.');
+      return;
+    }
+
+    try {
+      setIsExportingPng(true);
+      await exportMapToPng(mapContainer, activeMapName || 'trasa', { scale: 2 });
+      onShowNotification(`PNG obrázek mapy "${activeMapName}" byl úspěšně stažen.`);
+      onClose();
+    } catch (err) {
+      console.error('PNG export failed:', err);
+      onShowNotification('Chyba při generování PNG obrázku mapy.');
+    } finally {
+      setIsExportingPng(false);
     }
   };
 
@@ -175,16 +196,47 @@ export function ExportModal({
             </button>
           </div>
 
-          {/* Secondary Grid: SVG & GeoJSON */}
+          {/* Secondary Grid: PNG, SVG & GeoJSON */}
           <div className="export-secondary-grid">
+            {/* PNG Image Export */}
+            <div className="export-card secondary-export-card">
+              <div className="export-card-header compact">
+                <div className="export-card-icon-wrap png">
+                  <ImageIcon size={18} />
+                </div>
+                <div className="export-card-info">
+                  <h4 className="export-card-title-sm">PNG obrázek</h4>
+                  <p className="export-card-desc-sm">Obrázek mapy s trasou ve vysokém rozlišení.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn-action secondary export-btn-sm"
+                onClick={handlePngExport}
+                disabled={isExportingPng}
+              >
+                {isExportingPng ? (
+                  <>
+                    <Loader2 size={13} className="spinner-icon-inline" />
+                    <span>Ukládám...</span>
+                  </>
+                ) : (
+                  <>
+                    <ImageIcon size={14} />
+                    <span>Stáhnout PNG (.png)</span>
+                  </>
+                )}
+              </button>
+            </div>
+
             {/* SVG Export */}
             <div className="export-card secondary-export-card">
               <div className="export-card-header compact">
                 <div className="export-card-icon-wrap svg">
-                  <ImageIcon size={18} />
+                  <FileCode2 size={18} />
                 </div>
                 <div className="export-card-info">
-                  <h4 className="export-card-title-sm">SVG vektorový obrázek</h4>
+                  <h4 className="export-card-title-sm">SVG vektor</h4>
                   <p className="export-card-desc-sm">Čistá vektorová grafika tras pro grafické editory.</p>
                 </div>
               </div>
@@ -193,7 +245,7 @@ export function ExportModal({
                 className="btn-action secondary export-btn-sm"
                 onClick={handleSvgExport}
               >
-                <ImageIcon size={14} />
+                <FileCode2 size={14} />
                 <span>Stáhnout SVG (.svg)</span>
               </button>
             </div>
@@ -206,7 +258,7 @@ export function ExportModal({
                 </div>
                 <div className="export-card-info">
                   <h4 className="export-card-title-sm">GeoJSON data</h4>
-                  <p className="export-card-desc-sm">Všechna data tras a bodů pro GIS a import do CRP.</p>
+                  <p className="export-card-desc-sm">Data tras a bodů pro GIS a import do CRP.</p>
                 </div>
               </div>
               <button
