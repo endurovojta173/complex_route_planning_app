@@ -68,3 +68,8 @@ The application includes a multi-stage `Dockerfile` and `docker-compose.yml` sup
 - Perform code validation strictly using the linter (`oxlint`) and TypeScript build (`tsc -b && vite build`).
 - Only launch the browser agent if the user explicitly requests it in their message.
 
+## Agent Behavior & Efficiency Rules
+- Do NOT re-read or explore the same files repeatedly before making edits. Make edits directly and concisely.
+- Keep tool calls to the minimum required to complete the task; do not execute redundant `view_file` checks.
+- Prioritize execution speed and avoid unnecessary intermediate steps.
+
