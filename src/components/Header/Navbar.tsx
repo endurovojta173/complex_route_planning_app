@@ -41,8 +41,8 @@ export function Navbar({
           <Navigation size={18} />
         </div>
         <div className="brand-info">
-          <span className="brand-title">RouteCraft</span>
-          <span className="brand-subtitle">Route Planner</span>
+          <span className="brand-title">CRP</span>
+          <span className="brand-subtitle">complex route planning app</span>
         </div>
       </div>
 

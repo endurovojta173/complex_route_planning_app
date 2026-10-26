@@ -27,7 +27,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
           <div className="modal-title-wrap">
             <Info size={18} className="modal-title-icon" />
             <h2 id="info-modal-title" className="modal-title">
-              O aplikaci RouteCraft
+              O aplikaci CRP — Complex Route Planning App
             </h2>
             <span className="modal-badge-pill">Lokální nástroj</span>
           </div>
@@ -104,7 +104,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
                 <strong>místní tradiční folklorní slavnost</strong>.
               </p>
               <p className="story-paragraph">
-                Při organizaci folklorních průvodů, krojovaných průvodců, logistického zázemí a zásobovacích bodů bylo potřeba připravit detailní mapové podklady s přesným větvením tras, objížďkami a shromažďovacími zónami. Komerční navigace a běžné mapy neumožňují snadné kreslení rozvětvených tras se zachycením k vrcholům bez vzniku mezer a bez nutnosti placených GIS licencí. RouteCraft byl navržen tak, aby toto řešil jednoduše, přímo v prohlížeči a zcela zdarma.
+                Při organizaci folklorních průvodů, krojovaných průvodců, logistického zázemí a zásobovacích bodů bylo potřeba připravit detailní mapové podklady s přesným větvením tras, objížďkami a shromažďovacími zónami. Komerční navigace a běžné mapy neumožňují snadné kreslení rozvětvených tras se zachycením k vrcholům bez vzniku mezer a bez nutnosti placených GIS licencí. Nástroj CRP (Complex Route Planning App) byl navržen tak, aby toto řešil jednoduše, přímo v prohlížeči a zcela zdarma.
               </p>
             </div>
           </div>
@@ -156,7 +156,7 @@ export function InfoModal({ isOpen, onClose }: InfoModalProps) {
         {/* Modal Footer */}
         <div className="modal-footer">
           <div className="footer-info">
-            <span>RouteCraft &bull; Autor: Vojtěch Břenek (endurovojta173)</span>
+            <span>CRP — Complex Route Planning App &bull; Autor: Vojtěch Břenek (endurovojta173)</span>
           </div>
           <div className="info-modal-footer-actions">
             <a

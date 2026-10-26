@@ -1,4 +1,15 @@
 import type { FeatureCollection } from 'geojson';
+import type { RouteCategory } from '../utils/routeColors';
+export type { RouteCategory };
+
+export interface CategoryStat {
+  categoryId: string;
+  categoryName: string;
+  shortName: string;
+  color: string;
+  distanceKm: number;
+  count: number;
+}
 
 export interface RouteStats {
   totalDistanceKm: number;
@@ -6,6 +17,7 @@ export interface RouteStats {
   lineCount: number;
   polygonCount: number;
   markerCount: number;
+  categoryStats?: CategoryStat[];
 }
 
 export type TileProviderId = 'osm' | 'satellite';

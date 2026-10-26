@@ -1,5 +1,11 @@
 import type { FeatureCollection } from 'geojson';
 import type { RouteStats, SavedMapItem } from '../types/route';
+import {
+  getSavedCategories,
+  getCategoryById,
+  getCategoryByColor,
+  type RouteCategory,
+} from './routeColors';
 
 export const LEGACY_STORAGE_KEY = 'complex_route_planner_geojson';
 export const MAPS_LIST_KEY = 'complex_route_planner_maps_list';
@@ -30,19 +36,42 @@ export function calculateHaversineDistance(
 /**
  * Computes route statistics from a GeoJSON FeatureCollection.
  */
-export function calculateRouteStats(collection: FeatureCollection): RouteStats {
+export function calculateRouteStats(
+  collection: FeatureCollection,
+  categoriesList?: RouteCategory[]
+): RouteStats {
+  const categories = categoriesList || getSavedCategories();
   let totalDistanceKm = 0;
   let lineCount = 0;
   let polygonCount = 0;
   let markerCount = 0;
 
+  const catStatsMap = new Map<string, { distanceKm: number; count: number }>();
+  for (const cat of categories) {
+    catStatsMap.set(cat.id, { distanceKm: 0, count: 0 });
+  }
+
   for (const feature of collection.features) {
     if (!feature.geometry) continue;
+
+    // Match feature to category
+    const roleId = feature.properties?.role;
+    const color = feature.properties?.color || feature.properties?.stroke;
+    let matchedCat = categories[0];
+    if (roleId) {
+      matchedCat = getCategoryById(roleId, categories);
+    } else if (color) {
+      matchedCat = getCategoryByColor(color, categories);
+    }
+
+    const catRecord = catStatsMap.get(matchedCat.id) || { distanceKm: 0, count: 0 };
+    catRecord.count++;
 
     const geometry = feature.geometry;
     if (geometry.type === 'GeometryCollection') continue;
 
     const { type, coordinates } = geometry;
+    let featDistance = 0;
 
     if (type === 'LineString') {
       lineCount++;
@@ -50,7 +79,7 @@ export function calculateRouteStats(collection: FeatureCollection): RouteStats {
       for (let i = 0; i < coords.length - 1; i++) {
         const [lon1, lat1] = coords[i];
         const [lon2, lat2] = coords[i + 1];
-        totalDistanceKm += calculateHaversineDistance(lat1, lon1, lat2, lon2);
+        featDistance += calculateHaversineDistance(lat1, lon1, lat2, lon2);
       }
     } else if (type === 'MultiLineString') {
       lineCount++;
@@ -59,7 +88,7 @@ export function calculateRouteStats(collection: FeatureCollection): RouteStats {
         for (let i = 0; i < segment.length - 1; i++) {
           const [lon1, lat1] = segment[i];
           const [lon2, lat2] = segment[i + 1];
-          totalDistanceKm += calculateHaversineDistance(lat1, lon1, lat2, lon2);
+          featDistance += calculateHaversineDistance(lat1, lon1, lat2, lon2);
         }
       }
     } else if (type === 'Polygon' || type === 'MultiPolygon') {
@@ -67,7 +96,22 @@ export function calculateRouteStats(collection: FeatureCollection): RouteStats {
     } else if (type === 'Point') {
       markerCount++;
     }
+
+    totalDistanceKm += featDistance;
+    catRecord.distanceKm += featDistance;
   }
+
+  const categoryStats = categories.map((cat) => {
+    const record = catStatsMap.get(cat.id) || { distanceKm: 0, count: 0 };
+    return {
+      categoryId: cat.id,
+      categoryName: cat.name,
+      shortName: cat.shortName,
+      color: cat.color,
+      distanceKm: Number(record.distanceKm.toFixed(2)),
+      count: record.count,
+    };
+  });
 
   return {
     totalDistanceKm: Number(totalDistanceKm.toFixed(2)),
@@ -75,6 +119,7 @@ export function calculateRouteStats(collection: FeatureCollection): RouteStats {
     lineCount,
     polygonCount,
     markerCount,
+    categoryStats,
   };
 }
 

@@ -8,9 +8,18 @@ import type { RouteStats, TileProviderId, SearchLocation } from '../../types/rou
 import { TILE_PROVIDERS } from '../../utils/tileProviders';
 import {
   calculateRouteStats,
+  calculateHaversineDistance,
   loadGeoJsonFromStorage,
   saveGeoJsonToStorage,
 } from '../../utils/geoJsonStorage';
+import {
+  ROUTE_CATEGORIES,
+  DEFAULT_CATEGORY,
+  getCategoryById,
+  getCategoryByColor,
+  type RouteCategory,
+} from '../../utils/routeColors';
+import { RouteColorsBar } from './RouteColorsBar';
 
 // Fix Leaflet default marker icons for bundlers
 import markerIconPng from 'leaflet/dist/images/marker-icon.png';
@@ -29,6 +38,26 @@ const DefaultMarkerIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultMarkerIcon;
 
+function createColoredMarkerIcon(color: string) {
+  return L.divIcon({
+    className: 'custom-colored-marker',
+    html: `<div style="
+      width: 22px;
+      height: 22px;
+      background: ${color};
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    "><div style="width: 6px; height: 6px; background: #ffffff; border-radius: 50%;"></div></div>`,
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+    popupAnchor: [0, -12],
+  });
+}
+
 interface RouteMapProps {
   tileProviderId: TileProviderId;
   onStatsChange: (stats: RouteStats) => void;
@@ -36,6 +65,10 @@ interface RouteMapProps {
   importGeoJsonData: FeatureCollection | null;
   clearTrigger: number;
   searchTarget: SearchLocation | null;
+  activeCategory: RouteCategory;
+  onActiveCategoryChange: (cat: RouteCategory) => void;
+  categories: RouteCategory[];
+  onRenameCategory: (id: string, newName: string) => void;
 }
 
 export function RouteMap({
@@ -45,6 +78,10 @@ export function RouteMap({
   importGeoJsonData,
   clearTrigger,
   searchTarget,
+  activeCategory,
+  onActiveCategoryChange,
+  categories,
+  onRenameCategory,
 }: RouteMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -53,13 +90,17 @@ export function RouteMap({
   const searchMarkerRef = useRef<L.Layer | null>(null);
   const [isMapReady, setIsMapReady] = useState(false);
 
+  const categoriesRef = useRef(categories);
   const onStatsChangeRef = useRef(onStatsChange);
   const onGeoJsonChangeRef = useRef(onGeoJsonChange);
+  const activeCategoryRef = useRef(activeCategory);
 
   useEffect(() => {
+    categoriesRef.current = categories;
     onStatsChangeRef.current = onStatsChange;
     onGeoJsonChangeRef.current = onGeoJsonChange;
-  }, [onStatsChange, onGeoJsonChange]);
+    activeCategoryRef.current = activeCategory;
+  }, [categories, onStatsChange, onGeoJsonChange, activeCategory]);
 
   // Synchronize drawn layers to localStorage and notify parent
   const syncLayers = useCallback(() => {
@@ -70,19 +111,35 @@ export function RouteMap({
     drawnItems.eachLayer((layer: any) => {
       if (typeof layer.toGeoJSON === 'function') {
         const geo = layer.toGeoJSON();
+        const role = layer.feature?.properties?.role || 'parade';
+        const roleName = layer.feature?.properties?.roleName || 'Zelená';
+        const color = layer.options?.color || layer.feature?.properties?.color || DEFAULT_CATEGORY.color;
+        const fillColor = layer.options?.fillColor || layer.feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+
         if (geo.type === 'Feature') {
+          geo.properties = {
+            ...(geo.properties || {}),
+            role,
+            roleName,
+            color,
+            fillColor,
+            stroke: color,
+            'stroke-width': 4,
+          };
           features.push(geo);
         } else if (geo.type === 'FeatureCollection') {
-          features.push(...geo.features);
-        } else {
-          features.push({
-            type: 'Feature',
-            properties: {
-              stroke: '#10b981',
+          for (const feat of geo.features) {
+            feat.properties = {
+              ...(feat.properties || {}),
+              role,
+              roleName,
+              color,
+              fillColor,
+              stroke: color,
               'stroke-width': 4,
-            },
-            geometry: geo,
-          });
+            };
+            features.push(feat);
+          }
         }
       }
     });
@@ -93,12 +150,113 @@ export function RouteMap({
     };
 
     saveGeoJsonToStorage(collection);
-    const stats = calculateRouteStats(collection);
+    const stats = calculateRouteStats(collection, categoriesRef.current);
     onStatsChangeRef.current(stats);
     if (onGeoJsonChangeRef.current) {
       onGeoJsonChangeRef.current(collection);
     }
   }, []);
+
+  // Update a specific layer's category and recolor it
+  const updateLayerCategory = useCallback(
+    (layer: any, newCat: RouteCategory) => {
+      layer.feature = layer.feature || { type: 'Feature', properties: {} };
+      layer.feature.properties = {
+        ...(layer.feature.properties || {}),
+        role: newCat.id,
+        roleName: newCat.name,
+        color: newCat.color,
+        fillColor: newCat.fillColor,
+        stroke: newCat.color,
+      };
+
+      if (typeof layer.setStyle === 'function') {
+        layer.setStyle({
+          color: newCat.color,
+          fillColor: newCat.fillColor,
+          weight: 4,
+          opacity: 0.9,
+        });
+      } else if (typeof layer.setIcon === 'function') {
+        layer.setIcon(createColoredMarkerIcon(newCat.color));
+      }
+
+      syncLayers();
+    },
+    [syncLayers]
+  );
+
+  // Build the recoloring popup for any drawn layer
+  const createLayerPopupContent = useCallback(
+    (layer: any): HTMLElement => {
+      const container = document.createElement('div');
+      container.className = 'layer-recolor-popup';
+
+      const currentRole = layer.feature?.properties?.role;
+      const currentColor = layer.feature?.properties?.color || layer.options?.color;
+      let currentCat = DEFAULT_CATEGORY;
+      if (currentRole) {
+        currentCat = getCategoryById(currentRole, categoriesRef.current);
+      } else if (currentColor) {
+        currentCat = getCategoryByColor(currentColor, categoriesRef.current);
+      }
+
+      // Calculate distance if polyline
+      let distanceText = '';
+      if (typeof layer.getLatLngs === 'function') {
+        try {
+          const latlngs = layer.getLatLngs();
+          const flat = Array.isArray(latlngs[0]) ? latlngs.flat(Infinity) : latlngs;
+          let distKm = 0;
+          for (let i = 0; i < flat.length - 1; i++) {
+            if (flat[i] && flat[i + 1]) {
+              distKm += calculateHaversineDistance(flat[i].lat, flat[i].lng, flat[i + 1].lat, flat[i + 1].lng);
+            }
+          }
+          if (distKm > 0) {
+            distanceText = distKm < 1 ? `${Math.round(distKm * 1000)} m` : `${distKm.toFixed(2)} km`;
+          }
+        } catch {
+          // Ignore formatting issues
+        }
+      }
+
+      container.innerHTML = `
+        <div class="popup-top-row">
+          <span class="popup-role-pill" style="border-color:${currentCat.color}; color:${currentCat.color};">
+            <span class="popup-dot" style="background-color: ${currentCat.color};"></span>
+            ${currentCat.name}
+          </span>
+          ${distanceText ? `<span class="popup-dist-badge">${distanceText}</span>` : ''}
+        </div>
+        <div class="popup-instruction">Vyberte novou barvu / typ úseku:</div>
+        <div class="popup-buttons-grid"></div>
+      `;
+
+      const grid = container.querySelector('.popup-buttons-grid');
+      if (grid) {
+        const list = categoriesRef.current || ROUTE_CATEGORIES;
+        list.forEach((cat) => {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = `popup-cat-btn ${cat.id === currentCat.id ? 'active' : ''}`;
+          btn.title = cat.description;
+          btn.innerHTML = `
+            <span class="popup-btn-dot" style="background-color: ${cat.color};"></span>
+            <span class="popup-btn-text">${cat.shortName}</span>
+          `;
+          btn.addEventListener('click', () => {
+            updateLayerCategory(layer, cat);
+            layer.closePopup();
+          });
+          grid.appendChild(btn);
+        });
+      }
+
+      return container;
+    },
+    [updateLayerCategory]
+  );
 
   const bindLayerEvents = useCallback(
     function attachEvents(layer: L.Layer) {
@@ -117,8 +275,14 @@ export function RouteMap({
         }
         syncLayers();
       });
+
+      // Attach recolor popup
+      layer.bindPopup(() => createLayerPopupContent(layer), {
+        className: 'custom-recolor-popup',
+        maxWidth: 290,
+      });
     },
-    [syncLayers]
+    [syncLayers, createLayerPopupContent]
   );
 
   const initialTileProviderRef = useRef(tileProviderId);
@@ -167,10 +331,11 @@ export function RouteMap({
       rotateMode: false,
     });
 
-    // Set styling options for newly drawn shapes
+    // Set styling options for newly drawn shapes based on active category
+    const initialCat = activeCategoryRef.current;
     map.pm.setPathOptions({
-      color: '#10b981',
-      fillColor: '#34d399',
+      color: initialCat.color,
+      fillColor: initialCat.fillColor,
       fillOpacity: 0.25,
       weight: 4,
     });
@@ -186,8 +351,32 @@ export function RouteMap({
     // Event listeners on map for Geoman operations
     const handlePmCreate = (e: any) => {
       if (e.layer) {
-        drawnItems.addLayer(e.layer);
-        bindLayerEvents(e.layer);
+        const layer = e.layer;
+        const currentCat = activeCategoryRef.current;
+
+        layer.feature = layer.feature || { type: 'Feature', properties: {} };
+        layer.feature.properties = {
+          ...layer.feature.properties,
+          role: currentCat.id,
+          roleName: currentCat.name,
+          color: currentCat.color,
+          fillColor: currentCat.fillColor,
+          stroke: currentCat.color,
+        };
+
+        if (typeof layer.setStyle === 'function') {
+          layer.setStyle({
+            color: currentCat.color,
+            fillColor: currentCat.fillColor,
+            weight: 4,
+            opacity: 0.9,
+          });
+        } else if (typeof layer.setIcon === 'function') {
+          layer.setIcon(createColoredMarkerIcon(currentCat.color));
+        }
+
+        drawnItems.addLayer(layer);
+        bindLayerEvents(layer);
         syncLayers();
       }
     };
@@ -204,14 +393,28 @@ export function RouteMap({
     if (savedGeoJson && savedGeoJson.features && savedGeoJson.features.length > 0) {
       try {
         const geoLayer = L.geoJSON(savedGeoJson, {
-          style: {
-            color: '#10b981',
-            weight: 4,
-            opacity: 0.9,
-            fillColor: '#34d399',
-            fillOpacity: 0.25,
+          style: (feature) => {
+            const col = feature?.properties?.color || feature?.properties?.stroke || DEFAULT_CATEGORY.color;
+            const fillCol = feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+            return {
+              color: col,
+              weight: 4,
+              opacity: 0.9,
+              fillColor: fillCol,
+              fillOpacity: 0.25,
+            };
           },
-          onEachFeature: (_feature, layer) => {
+          pointToLayer: (feature, latlng) => {
+            const col = feature?.properties?.color || DEFAULT_CATEGORY.color;
+            return L.marker(latlng, { icon: createColoredMarkerIcon(col) });
+          },
+          onEachFeature: (feature, layer) => {
+            (layer as any).feature = feature;
+            if ((layer as any).setStyle) {
+              const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
+              const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+              (layer as any).setStyle({ color: col, fillColor: fillCol });
+            }
             drawnItems.addLayer(layer);
             bindLayerEvents(layer);
           },
@@ -244,6 +447,18 @@ export function RouteMap({
     };
   }, [bindLayerEvents, syncLayers]);
 
+  // Update Geoman path drawing styles whenever activeCategory changes
+  useEffect(() => {
+    if (mapInstanceRef.current && (mapInstanceRef.current as any).pm) {
+      (mapInstanceRef.current as any).pm.setPathOptions({
+        color: activeCategory.color,
+        fillColor: activeCategory.fillColor,
+        fillOpacity: 0.25,
+        weight: 4,
+      });
+    }
+  }, [activeCategory]);
+
   // Update Tile Layer when provider changes
   useEffect(() => {
     if (!mapInstanceRef.current) return;
@@ -268,14 +483,28 @@ export function RouteMap({
 
     try {
       const geoLayer = L.geoJSON(importGeoJsonData, {
-        style: {
-          color: '#059669',
-          weight: 4,
-          opacity: 0.9,
-          fillColor: '#10b981',
-          fillOpacity: 0.25,
+        style: (feature) => {
+          const col = feature?.properties?.color || feature?.properties?.stroke || DEFAULT_CATEGORY.color;
+          const fillCol = feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+          return {
+            color: col,
+            weight: 4,
+            opacity: 0.9,
+            fillColor: fillCol,
+            fillOpacity: 0.25,
+          };
         },
-        onEachFeature: (_feature, layer) => {
+        pointToLayer: (feature, latlng) => {
+          const col = feature?.properties?.color || DEFAULT_CATEGORY.color;
+          return L.marker(latlng, { icon: createColoredMarkerIcon(col) });
+        },
+        onEachFeature: (feature, layer) => {
+          (layer as any).feature = feature;
+          if ((layer as any).setStyle) {
+            const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
+            const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+            (layer as any).setStyle({ color: col, fillColor: fillCol });
+          }
           drawnItemsRef.current?.addLayer(layer);
           bindLayerEvents(layer);
         },
@@ -314,7 +543,6 @@ export function RouteMap({
 
     // Center map with smooth fly animation
     if (boundingBox && boundingBox.length === 4) {
-      // Nominatim boundingbox: [south, north, west, east]
       const [south, north, west, east] = boundingBox.map(Number);
       if (!isNaN(south) && !isNaN(north) && !isNaN(west) && !isNaN(east)) {
         map.flyToBounds(
@@ -335,7 +563,7 @@ export function RouteMap({
       map.flyTo([lat, lon], 15, { duration: 1.5 });
     }
 
-    // Add a pulsing visual marker for the searched place (ignored by Geoman)
+    // Add a visual marker for the searched place (ignored by Geoman)
     const marker = L.circleMarker([lat, lon], {
       radius: 9,
       color: '#047857',
@@ -361,6 +589,15 @@ export function RouteMap({
   return (
     <div className="map-wrapper" id="route-map-container">
       <div ref={mapContainerRef} className="leaflet-container-view" id="leaflet-map" />
+
+      {/* Floating Active Category Bar */}
+      <RouteColorsBar
+        categories={categories}
+        activeCategory={activeCategory}
+        onSelectCategory={onActiveCategoryChange}
+        onRenameCategory={onRenameCategory}
+      />
+
       {!isMapReady && (
         <div className="map-loader-backdrop">
           <div className="spinner" />

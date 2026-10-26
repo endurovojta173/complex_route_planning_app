@@ -7,6 +7,12 @@ import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
 import { InfoModal } from './components/Info/InfoModal';
 import type { RouteStats, TileProviderId, SearchLocation, SavedMapItem } from './types/route';
 import {
+  DEFAULT_CATEGORY,
+  getSavedCategories,
+  saveCustomCategoryName,
+  type RouteCategory,
+} from './utils/routeColors';
+import {
   downloadGeoJsonFile,
   getAllSavedMaps,
   getActiveMapId,
@@ -15,14 +21,17 @@ import {
   createNewMap,
   duplicateMapItem,
   deleteMapItem,
+  calculateRouteStats,
 } from './utils/geoJsonStorage';
 import './App.css';
 
 export default function App() {
+  const [categories, setCategories] = useState<RouteCategory[]>(() => getSavedCategories());
   const [savedMaps, setSavedMaps] = useState<SavedMapItem[]>(() => getAllSavedMaps());
   const [activeMapId, setActiveMapIdState] = useState<string>(() => getActiveMapId());
   const [isMapsModalOpen, setIsMapsModalOpen] = useState(false);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<RouteCategory>(() => getSavedCategories()[0] || DEFAULT_CATEGORY);
 
   const activeMap = savedMaps.find((m) => m.id === activeMapId) || savedMaps[0];
 
@@ -143,6 +152,21 @@ export default function App() {
     }
   };
 
+  // Rename route color category
+  const handleRenameCategory = (id: string, newName: string) => {
+    const updated = saveCustomCategoryName(id, newName);
+    setCategories(updated);
+    setActiveCategory((prev) => {
+      const found = updated.find((c) => c.id === id);
+      return found || prev;
+    });
+    if (currentGeoJson) {
+      setStats(calculateRouteStats(currentGeoJson, updated));
+    }
+    const catItem = updated.find((c) => c.id === id);
+    showNotification(`Barva přejmenována na: ${catItem?.name || newName}`);
+  };
+
   const handleExport = () => {
     const dataToExport = currentGeoJson || activeMap?.geoJson;
     if (!dataToExport || dataToExport.features.length === 0) {
@@ -243,7 +267,10 @@ export default function App() {
           stats={stats}
           currentTileId={currentTileId}
           onTileSelect={setCurrentTileId}
-          onOpenInfoModal={() => setIsInfoModalOpen(true)}
+          activeCategory={activeCategory}
+          onSelectCategory={setActiveCategory}
+          categories={categories}
+          onRenameCategory={handleRenameCategory}
         />
 
         <RouteMap
@@ -253,6 +280,10 @@ export default function App() {
           importGeoJsonData={importedGeoJson}
           clearTrigger={clearTrigger}
           searchTarget={searchTarget}
+          activeCategory={activeCategory}
+          onActiveCategoryChange={setActiveCategory}
+          categories={categories}
+          onRenameCategory={handleRenameCategory}
         />
       </main>
 

@@ -1,4 +1,4 @@
-# RouteCraft — Complex Route Planning App
+# CRP — Complex Route Planning App
 
 A modern, high-performance client-side web application for interactive map drawing, route branching, and local persistence directly in the browser.
 
