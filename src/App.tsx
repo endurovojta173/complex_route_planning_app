@@ -2,7 +2,6 @@ import { useState, useRef, useMemo } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
-import { ControlPanel } from './components/Sidebar/ControlPanel';
 import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
 import { InfoModal } from './components/Info/InfoModal';
 import { ExportModal } from './components/Modals/ExportModal';
@@ -315,8 +314,6 @@ export default function App() {
       />
 
       <main className="main-content">
-        <ControlPanel stats={stats} />
-
         <RouteMap
           tileProviderId={currentTileId}
           onTileSelect={setCurrentTileId}
