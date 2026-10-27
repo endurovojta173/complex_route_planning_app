@@ -1,9 +1,13 @@
-import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen, Info } from 'lucide-react';
+import { Navigation, HardDriveDownload, FolderUp, Trash2, FolderOpen, Info, Undo2, Redo2 } from 'lucide-react';
 import type { SearchLocation } from '../../types/route';
 import { SearchBar } from '../Search/SearchBar';
 
 interface NavbarProps {
   savedMapsCount: number;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
   onOpenMapsModal: () => void;
   onOpenInfoModal: () => void;
   onExport: () => void;
@@ -14,6 +18,10 @@ interface NavbarProps {
 
 export function Navbar({
   savedMapsCount,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
   onOpenMapsModal,
   onOpenInfoModal,
   onExport,
@@ -42,6 +50,32 @@ export function Navbar({
       </div>
 
       <div className="navbar-actions">
+        <div className="history-btn-group" role="group" aria-label="Historie změn trasy">
+          <button
+            type="button"
+            className="btn-history-action"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Krok zpět (Ctrl+Z)"
+            aria-label="Krok zpět (Ctrl+Z)"
+            id="btn-undo"
+          >
+            <Undo2 size={15} />
+          </button>
+          <div className="history-btn-divider" />
+          <button
+            type="button"
+            className="btn-history-action"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Krok vpřed (Ctrl+Y / Ctrl+Shift+Z)"
+            aria-label="Krok vpřed (Ctrl+Shift+Z)"
+            id="btn-redo"
+          >
+            <Redo2 size={15} />
+          </button>
+        </div>
+
         <button
           type="button"
           className="btn-action secondary maps-btn"

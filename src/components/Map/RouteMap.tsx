@@ -86,6 +86,7 @@ interface RouteMapProps {
   onStatsChange: (stats: RouteStats) => void;
   onGeoJsonChange?: (geoJson: FeatureCollection) => void;
   importGeoJsonData: FeatureCollection | null;
+  restoreGeoJsonData?: { geoJson: FeatureCollection; id: number } | null;
   clearTrigger: number;
   searchTarget: SearchLocation | null;
   activeCategory: RouteCategory;
@@ -103,6 +104,7 @@ export function RouteMap({
   onStatsChange,
   onGeoJsonChange,
   importGeoJsonData,
+  restoreGeoJsonData,
   clearTrigger,
   searchTarget,
   activeCategory,
@@ -689,6 +691,53 @@ export function RouteMap({
     [syncLayers, createLayerPopupContent, updateLayerArrows, handleInsertPointIntoPolyline]
   );
 
+  // Helper to render GeoJSON features into drawnItems layer
+  const renderGeoJsonFeatures = useCallback(
+    (geoData: FeatureCollection) => {
+      const drawnItems = drawnItemsRef.current;
+      if (!drawnItems) return null;
+
+      return L.geoJSON(geoData, {
+        style: (feature) => {
+          const col = feature?.properties?.color || feature?.properties?.stroke || DEFAULT_CATEGORY.color;
+          const fillCol = feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+          return {
+            color: col,
+            weight: 4,
+            opacity: 0.9,
+            fillColor: fillCol,
+            fillOpacity: 0.25,
+          };
+        },
+        pointToLayer: (feature, latlng) => {
+          const col = feature?.properties?.color || DEFAULT_CATEGORY.color;
+          return L.marker(latlng, { icon: createColoredMarkerIcon(col) });
+        },
+        onEachFeature: (feature, layer) => {
+          (layer as any).feature = feature;
+          if ((layer as any).setStyle) {
+            const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
+            const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
+            (layer as any).setStyle({ color: col, fillColor: fillCol });
+          }
+          if (feature.properties?.name) {
+            const isPt = feature.geometry?.type === 'Point' || layer instanceof L.Marker;
+            layer.bindTooltip(feature.properties.name, {
+              permanent: true,
+              direction: 'top',
+              offset: isPt ? [0, -14] : [0, 0],
+              className: 'point-name-tooltip',
+            });
+          }
+          drawnItems.addLayer(layer);
+          bindLayerEvents(layer);
+          updateLayerArrows(layer);
+        },
+      });
+    },
+    [bindLayerEvents, updateLayerArrows]
+  );
+
   const initialTileProviderRef = useRef(tileProviderId);
 
   // Initialize Map and Geoman
@@ -825,48 +874,12 @@ export function RouteMap({
     const savedGeoJson = loadGeoJsonFromStorage();
     if (savedGeoJson && savedGeoJson.features && savedGeoJson.features.length > 0) {
       try {
-        const geoLayer = L.geoJSON(savedGeoJson, {
-          style: (feature) => {
-            const col = feature?.properties?.color || feature?.properties?.stroke || DEFAULT_CATEGORY.color;
-            const fillCol = feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
-            return {
-              color: col,
-              weight: 4,
-              opacity: 0.9,
-              fillColor: fillCol,
-              fillOpacity: 0.25,
-            };
-          },
-          pointToLayer: (feature, latlng) => {
-            const col = feature?.properties?.color || DEFAULT_CATEGORY.color;
-            return L.marker(latlng, { icon: createColoredMarkerIcon(col) });
-          },
-          onEachFeature: (feature, layer) => {
-            (layer as any).feature = feature;
-            if ((layer as any).setStyle) {
-              const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
-              const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
-              (layer as any).setStyle({ color: col, fillColor: fillCol });
-            }
-            if (feature.properties?.name) {
-              const isPt = feature.geometry?.type === 'Point' || layer instanceof L.Marker;
-              layer.bindTooltip(feature.properties.name, {
-                permanent: true,
-                direction: 'top',
-                offset: isPt ? [0, -14] : [0, 0],
-                className: 'point-name-tooltip',
-              });
-            }
-            drawnItems.addLayer(layer);
-            bindLayerEvents(layer);
-            updateLayerArrows(layer);
-          },
-        });
-
-        // Fit map bounds to loaded features
-        const bounds = geoLayer.getBounds();
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        const geoLayer = renderGeoJsonFeatures(savedGeoJson);
+        if (geoLayer) {
+          const bounds = geoLayer.getBounds();
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+          }
         }
       } catch (err) {
         console.error('Failed to parse and add saved GeoJSON features:', err);
@@ -972,7 +985,7 @@ export function RouteMap({
       arrowsContainerRef.current = null;
       tileLayerRef.current = null;
     };
-  }, [bindLayerEvents, syncLayers, updateLayerArrows, handleInsertPointIntoPolyline]);
+  }, [bindLayerEvents, syncLayers, updateLayerArrows, handleInsertPointIntoPolyline, renderGeoJsonFeatures]);
 
   // Toggle cursor style and Geoman draw when entering/exiting add-point mode
   useEffect(() => {
@@ -1036,54 +1049,37 @@ export function RouteMap({
     if (!importGeoJsonData || !drawnItemsRef.current || !mapInstanceRef.current) return;
 
     try {
-      const geoLayer = L.geoJSON(importGeoJsonData, {
-        style: (feature) => {
-          const col = feature?.properties?.color || feature?.properties?.stroke || DEFAULT_CATEGORY.color;
-          const fillCol = feature?.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
-          return {
-            color: col,
-            weight: 4,
-            opacity: 0.9,
-            fillColor: fillCol,
-            fillOpacity: 0.25,
-          };
-        },
-        pointToLayer: (feature, latlng) => {
-          const col = feature?.properties?.color || DEFAULT_CATEGORY.color;
-          return L.marker(latlng, { icon: createColoredMarkerIcon(col) });
-        },
-        onEachFeature: (feature, layer) => {
-          (layer as any).feature = feature;
-          if ((layer as any).setStyle) {
-            const col = feature.properties?.color || feature.properties?.stroke || DEFAULT_CATEGORY.color;
-            const fillCol = feature.properties?.fillColor || DEFAULT_CATEGORY.fillColor;
-            (layer as any).setStyle({ color: col, fillColor: fillCol });
-          }
-          if (feature.properties?.name) {
-            const isPt = feature.geometry?.type === 'Point' || layer instanceof L.Marker;
-            layer.bindTooltip(feature.properties.name, {
-              permanent: true,
-              direction: 'top',
-              offset: isPt ? [0, -14] : [0, 0],
-              className: 'point-name-tooltip',
-            });
-          }
-          drawnItemsRef.current?.addLayer(layer);
-          bindLayerEvents(layer);
-          updateLayerArrows(layer);
-        },
-      });
-
-      const bounds = geoLayer.getBounds();
-      if (bounds.isValid()) {
-        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      const geoLayer = renderGeoJsonFeatures(importGeoJsonData);
+      if (geoLayer) {
+        const bounds = geoLayer.getBounds();
+        if (bounds.isValid()) {
+          mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+        }
       }
-
       syncLayers();
     } catch (err) {
       console.error('Failed to render imported GeoJSON:', err);
     }
-  }, [importGeoJsonData, bindLayerEvents, syncLayers, updateLayerArrows]);
+  }, [importGeoJsonData, renderGeoJsonFeatures, syncLayers]);
+
+  // Handle undo/redo history restore without fitBounds (keeps map view stable)
+  useEffect(() => {
+    if (!restoreGeoJsonData || !drawnItemsRef.current || !mapInstanceRef.current) return;
+
+    try {
+      drawnItemsRef.current.clearLayers();
+      arrowsContainerRef.current?.clearLayers();
+      arrowLayersMapRef.current.clear();
+
+      renderGeoJsonFeatures(restoreGeoJsonData.geoJson);
+
+      const stats = calculateRouteStats(restoreGeoJsonData.geoJson, categoriesRef.current);
+      onStatsChangeRef.current(stats);
+      saveGeoJsonToStorage(restoreGeoJsonData.geoJson);
+    } catch (err) {
+      console.error('Failed to restore history GeoJSON:', err);
+    }
+  }, [restoreGeoJsonData, renderGeoJsonFeatures]);
 
   // Handle clearing all layers
   useEffect(() => {

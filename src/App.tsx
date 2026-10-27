@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
 import { Navbar } from './components/Header/Navbar';
@@ -66,6 +66,23 @@ export default function App() {
   const [searchTarget, setSearchTarget] = useState<SearchLocation | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // Undo / Redo change history state & refs
+  const historyRef = useRef<FeatureCollection[]>([
+    activeMap?.geoJson || { type: 'FeatureCollection', features: [] },
+  ]);
+  const historyIndexRef = useRef<number>(0);
+  const isRestoringHistoryRef = useRef<boolean>(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [restoreTrigger, setRestoreTrigger] = useState<{ geoJson: FeatureCollection; id: number } | null>(null);
+
+  const resetHistory = useCallback((initialGeoJson: FeatureCollection) => {
+    historyRef.current = [initialGeoJson];
+    historyIndexRef.current = 0;
+    setCanUndo(false);
+    setCanRedo(false);
+  }, []);
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const showNotification = (msg: string) => {
@@ -75,7 +92,7 @@ export default function App() {
     }, 3500);
   };
 
-  // Synchronize GeoJSON changes to active map in localStorage
+  // Synchronize GeoJSON changes to active map in localStorage & track history
   const handleGeoJsonChange = (geo: FeatureCollection) => {
     setCurrentGeoJson(geo);
     if (activeMap) {
@@ -88,13 +105,122 @@ export default function App() {
       saveMapItem(updatedMap);
       setSavedMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
     }
+
+    if (isRestoringHistoryRef.current) {
+      return;
+    }
+
+    const currentSnapshot = historyRef.current[historyIndexRef.current];
+    if (currentSnapshot && JSON.stringify(currentSnapshot.features) === JSON.stringify(geo.features)) {
+      return;
+    }
+
+    const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+    nextHistory.push(geo);
+    if (nextHistory.length > 50) {
+      nextHistory.shift();
+    }
+    historyRef.current = nextHistory;
+    historyIndexRef.current = nextHistory.length - 1;
+
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(false);
   };
+
+  const handleUndo = useCallback(() => {
+    if (historyIndexRef.current <= 0) return;
+
+    isRestoringHistoryRef.current = true;
+    historyIndexRef.current -= 1;
+    const targetGeoJson = historyRef.current[historyIndexRef.current];
+
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+
+    setCurrentGeoJson(targetGeoJson);
+    setRestoreTrigger({ geoJson: targetGeoJson, id: Date.now() });
+
+    if (activeMap) {
+      const updatedMap: SavedMapItem = {
+        ...activeMap,
+        geoJson: targetGeoJson,
+        updatedAt: new Date().toISOString(),
+      };
+      saveMapItem(updatedMap);
+      setSavedMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    }
+
+    setTimeout(() => {
+      isRestoringHistoryRef.current = false;
+    }, 60);
+  }, [activeMap]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndexRef.current >= historyRef.current.length - 1) return;
+
+    isRestoringHistoryRef.current = true;
+    historyIndexRef.current += 1;
+    const targetGeoJson = historyRef.current[historyIndexRef.current];
+
+    setCanUndo(historyIndexRef.current > 0);
+    setCanRedo(historyIndexRef.current < historyRef.current.length - 1);
+
+    setCurrentGeoJson(targetGeoJson);
+    setRestoreTrigger({ geoJson: targetGeoJson, id: Date.now() });
+
+    if (activeMap) {
+      const updatedMap: SavedMapItem = {
+        ...activeMap,
+        geoJson: targetGeoJson,
+        updatedAt: new Date().toISOString(),
+      };
+      saveMapItem(updatedMap);
+      setSavedMaps((prev) => prev.map((m) => (m.id === updatedMap.id ? updatedMap : m)));
+    }
+
+    setTimeout(() => {
+      isRestoringHistoryRef.current = false;
+    }, 60);
+  }, [activeMap]);
+
+  // Global Keyboard shortcuts for Undo (Ctrl+Z) and Redo (Ctrl+Y / Ctrl+Shift+Z)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modKey = isMac ? e.metaKey : e.ctrlKey;
+
+      if (modKey && !e.altKey) {
+        if (e.key === 'z' || e.key === 'Z') {
+          if (e.shiftKey) {
+            e.preventDefault();
+            handleRedo();
+          } else {
+            e.preventDefault();
+            handleUndo();
+          }
+        } else if (e.key === 'y' || e.key === 'Y') {
+          e.preventDefault();
+          handleRedo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   // Switch to another saved map
   const handleSelectMap = (map: SavedMapItem) => {
     setActiveMapId(map.id);
     setActiveMapIdState(map.id);
     setClearTrigger((prev) => prev + 1);
+
+    resetHistory(map.geoJson);
 
     setTimeout(() => {
       setImportedGeoJson(map.geoJson);
@@ -115,6 +241,7 @@ export default function App() {
     setClearTrigger((prev) => prev + 1);
     setCurrentGeoJson(newMap.geoJson);
     setStats(newMap.stats);
+    resetHistory(newMap.geoJson);
     setIsMapsModalOpen(false);
     showNotification(`Vytvořena nová mapa: ${newMap.name}`);
   };
@@ -138,6 +265,7 @@ export default function App() {
     const targetMap = updated.find((m) => m.id === newActiveId) || updated[0];
     if (targetMap) {
       setClearTrigger((prev) => prev + 1);
+      resetHistory(targetMap.geoJson);
       setTimeout(() => {
         setImportedGeoJson(targetMap.geoJson);
         setCurrentGeoJson(targetMap.geoJson);
@@ -243,7 +371,9 @@ export default function App() {
         const text = event.target?.result as string;
         const parsed = JSON.parse(text);
         if (parsed.type === 'FeatureCollection' && Array.isArray(parsed.features)) {
-          setImportedGeoJson(parsed as FeatureCollection);
+          const parsedGeo = parsed as FeatureCollection;
+          setImportedGeoJson(parsedGeo);
+          resetHistory(parsedGeo);
           showNotification(`Importováno ${parsed.features.length} prvků do aktivní mapy.`);
         } else {
           showNotification('Neplatný GeoJSON: očekáván objekt FeatureCollection.');
@@ -269,6 +399,7 @@ export default function App() {
     );
     if (confirmed) {
       setClearTrigger((prev) => prev + 1);
+      const emptyGeo: FeatureCollection = { type: 'FeatureCollection', features: [] };
       const emptyStats: RouteStats = {
         totalDistanceKm: 0,
         featureCount: 0,
@@ -277,11 +408,23 @@ export default function App() {
         markerCount: 0,
       };
       setStats(emptyStats);
+      setCurrentGeoJson(emptyGeo);
+
+      // Record cleared state into history so the user can undo it
+      if (!isRestoringHistoryRef.current) {
+        const nextHistory = historyRef.current.slice(0, historyIndexRef.current + 1);
+        nextHistory.push(emptyGeo);
+        if (nextHistory.length > 50) nextHistory.shift();
+        historyRef.current = nextHistory;
+        historyIndexRef.current = nextHistory.length - 1;
+        setCanUndo(true);
+        setCanRedo(false);
+      }
 
       if (activeMap) {
         const clearedMap: SavedMapItem = {
           ...activeMap,
-          geoJson: { type: 'FeatureCollection', features: [] },
+          geoJson: emptyGeo,
           stats: emptyStats,
           updatedAt: new Date().toISOString(),
         };
@@ -303,6 +446,10 @@ export default function App() {
     <div className="app-container">
       <Navbar
         savedMapsCount={savedMaps.length}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
         onOpenMapsModal={() => setIsMapsModalOpen(true)}
         onOpenInfoModal={() => setIsInfoModalOpen(true)}
         onExport={() => setIsExportModalOpen(true)}
@@ -318,6 +465,7 @@ export default function App() {
           onStatsChange={setStats}
           onGeoJsonChange={handleGeoJsonChange}
           importGeoJsonData={importedGeoJson}
+          restoreGeoJsonData={restoreTrigger}
           clearTrigger={clearTrigger}
           searchTarget={searchTarget}
           activeCategory={activeCategory}

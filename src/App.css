@@ -120,6 +120,48 @@
   justify-content: center;
 }
 
+/* History Undo/Redo Controls */
+.history-btn-group {
+  display: flex;
+  align-items: center;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  height: 32px;
+  padding: 0 2px;
+  overflow: hidden;
+}
+
+.btn-history-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn-history-action:hover:not(:disabled) {
+  background: var(--bg-glass-hover);
+  color: #ffffff;
+}
+
+.btn-history-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.history-btn-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--border-subtle);
+}
+
 /* Main Area */
 .main-content {
   position: relative;
