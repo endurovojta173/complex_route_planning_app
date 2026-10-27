@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import type { FeatureCollection } from 'geojson';
 import { RouteMap } from './components/Map/RouteMap';
+import { RouteStatsPanel } from './components/Map/RouteStatsPanel';
 import { Navbar } from './components/Header/Navbar';
 import { SavedMapsModal } from './components/SavedMaps/SavedMapsModal';
 import { InfoModal } from './components/Info/InfoModal';
@@ -475,6 +476,13 @@ export default function App() {
           onAddCategory={handleAddCategory}
           onRemoveCategory={handleRemoveCategory}
           onRenameCategory={handleRenameCategory}
+        />
+
+        <RouteStatsPanel
+          stats={stats}
+          categories={categories}
+          activeCategory={activeCategory}
+          onSelectCategory={setActiveCategory}
         />
       </main>
 

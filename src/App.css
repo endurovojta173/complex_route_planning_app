@@ -2043,3 +2043,250 @@
   background: var(--bg-secondary);
   border-top: 1px solid var(--border-subtle);
 }
+
+/* Route Distance & Legend Panel (Positioned on the left, below tool controls - No glow, no blur) */
+.stats-panel-minimized {
+  position: absolute;
+  left: 10px;
+  bottom: 16px;
+  z-index: 1000;
+}
+
+.btn-stats-minimize-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 32px;
+  padding: 0 0.75rem;
+  background-color: #092722;
+  border: 1px solid #16463e;
+  border-radius: 6px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.btn-stats-minimize-toggle:hover {
+  background-color: #0f3731;
+  border-color: #1f5c52;
+  color: #ffffff;
+}
+
+.stats-panel-icon {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.stats-min-label {
+  color: var(--text-muted);
+  font-size: 0.74rem;
+}
+
+.stats-min-value {
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.stats-arrow-icon {
+  color: var(--text-muted);
+  margin-left: 0.15rem;
+}
+
+.stats-panel-container {
+  position: absolute;
+  left: 10px;
+  bottom: 16px;
+  width: 248px;
+  max-width: calc(100vw - 20px);
+  max-height: calc(100vh - 350px);
+  background-color: #092722;
+  border: 1px solid #16463e;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  z-index: 1000;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stats-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  background-color: #0d352e;
+  border-bottom: 1px solid #16463e;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stats-panel-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.stats-panel-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.stats-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.stats-panel-total-badge {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+}
+
+.btn-stats-toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn-stats-toggle-icon:hover {
+  color: #ffffff;
+  background-color: #16463e;
+}
+
+.stats-panel-body {
+  padding: 0.5rem 0.75rem 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  overflow-y: auto;
+}
+
+.stats-empty-msg {
+  padding: 0.35rem 0;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.stats-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.stats-category-list::-webkit-scrollbar {
+  width: 3px;
+}
+.stats-category-list::-webkit-scrollbar-thumb {
+  background-color: #16463e;
+  border-radius: 3px;
+}
+
+.stats-category-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.28rem 0.4rem;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background-color: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.stats-category-row.clickable {
+  cursor: pointer;
+}
+
+.stats-category-row:hover {
+  background-color: #0f3731;
+}
+
+.stats-category-row.is-active {
+  background-color: #0d352e;
+  border-color: #1f5c52;
+}
+
+.stats-cat-left {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.stats-cat-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.stats-cat-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-category-row.is-active .stats-cat-name {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.stats-cat-right {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+
+.stats-cat-dist {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.stats-cat-count {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.stats-panel-footer {
+  padding-top: 0.4rem;
+  border-top: 1px solid #16463e;
+}
+
+.stats-summary-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.69rem;
+  color: var(--text-muted);
+}
+
+.stats-summary-meta strong {
+  color: var(--text-secondary);
+}
+
+.stats-sep {
+  color: var(--text-dim);
+  font-size: 0.65rem;
+}
