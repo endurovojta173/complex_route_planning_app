@@ -95,18 +95,18 @@ export function Navbar({
           id="btn-import-geojson"
         >
           <FolderUp size={14} />
-          <span>Import</span>
+          <span>Importovat</span>
         </button>
 
         <button
           type="button"
           className="btn-action primary"
           onClick={onExport}
-          title="Exportovat trasu do GeoJSON"
+          title="Exportovat trasu a mapu"
           id="btn-export-geojson"
         >
           <HardDriveDownload size={14} />
-          <span>Export</span>
+          <span>Exportovat</span>
         </button>
 
         <button

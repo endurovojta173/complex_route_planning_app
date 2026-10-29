@@ -548,7 +548,103 @@ export async function renderMapToCanvas(
   // 5. Draw North Arrow / Compass badge in corner
   drawNorthArrow(ctx, width - 45, 45);
 
+  // 6. Draw Official Cartographic Scale Bar in bottom-left corner
+  drawScaleBar(ctx, mapContainer, height);
+
   return canvas;
+}
+
+/**
+ * Draws an official cartographic scale bar directly on the map canvas
+ * using exact geodesic distances from Leaflet coordinate system.
+ */
+function drawScaleBar(
+  ctx: CanvasRenderingContext2D,
+  mapContainer: HTMLElement,
+  height: number
+): void {
+  const map: any = (mapContainer as any)._leaflet_map;
+  if (!map || typeof map.getCenter !== 'function' || typeof map.distance !== 'function') return;
+
+  const centerLatLng = map.getCenter();
+  const centerPoint = map.latLngToContainerPoint(centerLatLng);
+  const point100px = L.point(centerPoint.x + 100, centerPoint.y);
+  const latLng100px = map.containerPointToLatLng(point100px);
+  const metersIn100Px = map.distance(centerLatLng, latLng100px);
+
+  if (!metersIn100Px || isNaN(metersIn100Px) || metersIn100Px <= 0) return;
+
+  // Standard cartographic increments in meters
+  const scaleIncrements = [
+    10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000,
+  ];
+
+  // Target bar width ~90 to 130 pixels
+  const metersPerPx = metersIn100Px / 100;
+  const targetMeters = metersPerPx * 110;
+
+  let chosenMeters = scaleIncrements[0];
+  for (const inc of scaleIncrements) {
+    if (inc <= targetMeters) {
+      chosenMeters = inc;
+    } else {
+      break;
+    }
+  }
+
+  const barWidth = Math.round(chosenMeters / metersPerPx);
+  const label = chosenMeters >= 1000 ? `${chosenMeters / 1000} km` : `${chosenMeters} m`;
+
+  // Draw in bottom-left corner with margin
+  const x = 20;
+  const y = height - 20;
+  const barHeight = 4;
+  const halfWidth = Math.round(barWidth / 2);
+
+  ctx.save();
+
+  // Subtle clean background box for legibility over tiles
+  const boxWidth = barWidth + 24;
+  const boxHeight = 22;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+  ctx.fillRect(x - 6, y - 13, boxWidth, boxHeight);
+  ctx.strokeStyle = '#051d18';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x - 6, y - 13, boxWidth, boxHeight);
+
+  // Left segment: solid dark pine
+  ctx.fillStyle = '#051d18';
+  ctx.fillRect(x, y - barHeight, halfWidth, barHeight);
+
+  // Right segment: white
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(x + halfWidth, y - barHeight, halfWidth, barHeight);
+
+  // Outer border
+  ctx.strokeStyle = '#051d18';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y - barHeight, barWidth, barHeight);
+
+  // Ticks at 0, 50%, 100%
+  ctx.beginPath();
+  ctx.moveTo(x, y - barHeight - 2);
+  ctx.lineTo(x, y);
+  ctx.moveTo(x + halfWidth, y - barHeight - 2);
+  ctx.lineTo(x + halfWidth, y);
+  ctx.moveTo(x + barWidth, y - barHeight - 2);
+  ctx.lineTo(x + barWidth, y);
+  ctx.strokeStyle = '#051d18';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Scale label
+  ctx.font = 'bold 8px sans-serif';
+  ctx.fillStyle = '#051d18';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(label, x + halfWidth, y - barHeight - 2);
+
+  ctx.restore();
 }
 
 /**

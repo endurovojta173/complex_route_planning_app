@@ -22,9 +22,12 @@ export function ExportModal({
   onExportGeoJson,
   onShowNotification,
 }: ExportModalProps) {
+  const [docTitle, setDocTitle] = useState(activeMapName || 'Plán trasy');
+  const [docSubtitle, setDocSubtitle] = useState('Koordinační plán pro PČR, Městskou policii a složky IZS');
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [includeStats, setIncludeStats] = useState(true);
   const [includeLegend, setIncludeLegend] = useState(true);
+  const [includeSignOff, setIncludeSignOff] = useState(true);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [isExportingPng, setIsExportingPng] = useState(false);
 
@@ -40,14 +43,16 @@ export function ExportModal({
     try {
       setIsExportingPdf(true);
       await exportMapToPdf(mapContainer, {
-        title: activeMapName || 'Plán trasy',
+        title: docTitle.trim() || activeMapName || 'Plán trasy',
+        subtitle: docSubtitle.trim(),
         stats,
         categories,
         orientation,
         includeStats,
         includeLegend,
+        includeSignOff,
       });
-      onShowNotification(`PDF mapa "${activeMapName}" byla úspěšně stažena.`);
+      onShowNotification(`PDF tisková mapa "${docTitle.trim() || activeMapName}" byla úspěšně stažena.`);
       onClose();
     } catch (err) {
       console.error('PDF export failed:', err);
@@ -134,6 +139,34 @@ export function ExportModal({
 
             <div className="export-options-grid">
               <div className="export-option-group">
+                <label className="export-option-label" htmlFor="export-doc-title">
+                  Název dokumentu / akce:
+                </label>
+                <input
+                  id="export-doc-title"
+                  type="text"
+                  className="export-text-input"
+                  value={docTitle}
+                  onChange={(e) => setDocTitle(e.target.value)}
+                  placeholder="Např. Krojovaný průvod 2026 — Plán trasy"
+                />
+              </div>
+
+              <div className="export-option-group">
+                <label className="export-option-label" htmlFor="export-doc-subtitle">
+                  Podtitul (pro IZS, Policii ČR, pořadatele):
+                </label>
+                <input
+                  id="export-doc-subtitle"
+                  type="text"
+                  className="export-text-input"
+                  value={docSubtitle}
+                  onChange={(e) => setDocSubtitle(e.target.value)}
+                  placeholder="Např. Koordinační plán pro PČR, Městskou policii a složky IZS"
+                />
+              </div>
+
+              <div className="export-option-group">
                 <label className="export-option-label">Orientace stránky:</label>
                 <div className="orientation-toggle-group">
                   <button
@@ -160,7 +193,7 @@ export function ExportModal({
                     checked={includeStats}
                     onChange={(e) => setIncludeStats(e.target.checked)}
                   />
-                  <span>Zahrnout statistiky trasy (délka, úseky)</span>
+                  <span>Zahrnout statistiky trasy (celková délka, počty prvků)</span>
                 </label>
                 <label className="export-checkbox-label">
                   <input
@@ -168,7 +201,15 @@ export function ExportModal({
                     checked={includeLegend}
                     onChange={(e) => setIncludeLegend(e.target.checked)}
                   />
-                  <span>Zahrnout legendu kategorií tras</span>
+                  <span>Zahrnout barevnou legendu tras s kilometry větví</span>
+                </label>
+                <label className="export-checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={includeSignOff}
+                    onChange={(e) => setIncludeSignOff(e.target.checked)}
+                  />
+                  <span>Zahrnout podpisové pole velitele opatření / IZS</span>
                 </label>
               </div>
             </div>

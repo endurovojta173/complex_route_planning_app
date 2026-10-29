@@ -2,12 +2,35 @@ import type { RouteCategory, RouteStats } from '../types/route';
 
 export interface PdfExportOptions {
   title: string;
+  subtitle?: string;
   stats: RouteStats;
   categories: RouteCategory[];
   orientation: 'landscape' | 'portrait';
   includeStats: boolean;
   includeLegend: boolean;
+  includeSignOff?: boolean;
   dateStr?: string;
+}
+
+/**
+ * Converts a hex color string to PDF RGB components (0.0 to 1.0)
+ */
+function hexToPdfRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = (hex || '#2ebd7f').replace('#', '').trim();
+  let fullHex = clean;
+  if (clean.length === 3) {
+    fullHex = clean.split('').map((c) => c + c).join('');
+  }
+  const num = parseInt(fullHex, 16);
+  if (isNaN(num)) return { r: 0.18, g: 0.74, b: 0.5 };
+  const r = ((num >> 16) & 255) / 255;
+  const g = ((num >> 8) & 255) / 255;
+  const b = (num & 255) / 255;
+  return {
+    r: Number(r.toFixed(3)),
+    g: Number(g.toFixed(3)),
+    b: Number(b.toFixed(3)),
+  };
 }
 
 /**
@@ -25,7 +48,7 @@ function toPdfAscii(text: unknown): string {
 
 /**
  * Builds a valid, standard PDF 1.4 binary file with embedded JPEG map snapshot,
- * header, statistics, and category legend.
+ * header, statistics, color legend swatches, and official IZS / Police sign-off.
  */
 export async function createMapPdfBlob(
   canvas: HTMLCanvasElement,
@@ -54,19 +77,22 @@ export async function createMapPdfBlob(
   const imgPixelHeight = canvas.height;
 
   // Layout geometry (points)
-  const margin = 28;
-  const headerY = pageHeight - margin - 18;
+  const margin = 24;
+  const headerY = pageHeight - margin - 16;
   const subHeaderY = headerY - 14;
 
-  let contentTop = subHeaderY - 18;
+  let contentTop = subHeaderY - 16;
 
-  // If stats included, reserve space for stats row
+  // If stats included, reserve space for stats bar
   if (options.includeStats) {
     contentTop -= 22;
   }
 
-  // Reserve bottom space for legend / footer
+  // Reserve bottom space for legend / sign-off footer
   let contentBottom = margin + 14;
+  if (options.includeSignOff) {
+    contentBottom += 16;
+  }
   if (options.includeLegend && options.categories.length > 0) {
     contentBottom += 28;
   }
@@ -110,28 +136,31 @@ export async function createMapPdfBlob(
 
   // Header Bar: dark green header text & branding
   // Title
-  streamCmds += `BT /F2 16 Tf 0.04 0.15 0.12 rg ${margin} ${headerY} Td (${toPdfAscii(options.title)}) Tj ET\n`;
-  // Branding top right
+  streamCmds += `BT /F2 15 Tf 0.04 0.15 0.12 rg ${margin} ${headerY} Td (${toPdfAscii(options.title)}) Tj ET\n`;
+
+  // Branding & metadata top right
   const brandingText = 'CRP - Complex Route Planning';
-  streamCmds += `BT /F1 10 Tf 0.35 0.45 0.42 rg ${pageWidth - margin - 150} ${headerY} Td (${toPdfAscii(brandingText)}) Tj ET\n`;
+  streamCmds += `BT /F2 9 Tf 0.25 0.35 0.32 rg ${pageWidth - margin - 160} ${headerY + 2} Td (${toPdfAscii(brandingText)}) Tj ET\n`;
+  streamCmds += `BT /F1 7.5 Tf 0.45 0.55 0.52 rg ${pageWidth - margin - 160} ${headerY - 9} Td (${toPdfAscii(`WGS84 • Vystup pro IZS a PCR`)}) Tj ET\n`;
 
   // Subtitle / Date
-  const dateInfo = `Exportovano: ${dateStr}`;
-  streamCmds += `BT /F1 9 Tf 0.4 0.5 0.47 rg ${margin} ${subHeaderY} Td (${toPdfAscii(dateInfo)}) Tj ET\n`;
+  const subtitleText = options.subtitle || `Plan trasy a koordinace logistiky • Datum: ${dateStr}`;
+  streamCmds += `BT /F1 8.5 Tf 0.35 0.45 0.42 rg ${margin} ${subHeaderY} Td (${toPdfAscii(subtitleText)}) Tj ET\n`;
 
   // Statistics bar
   if (options.includeStats) {
-    const statsY = subHeaderY - 20;
+    const statsY = subHeaderY - 18;
     // Light subtle background box for stats
     streamCmds += `q 0.94 0.96 0.95 rg ${margin} ${statsY - 4} ${availWidth} 18 re f Q\n`;
     streamCmds += `q 0.82 0.88 0.85 RG 0.5 w ${margin} ${statsY - 4} ${availWidth} 18 re S Q\n`;
 
-    const distText = `Vzdalenost: ${options.stats.totalDistanceKm} km`;
-    const linesText = `Useky: ${options.stats.lineCount}`;
-    const featuresText = `Celkem prvku: ${options.stats.featureCount}`;
-    const statsSummary = `${distText}   |   ${linesText}   |   ${featuresText}`;
+    const distText = `Celkova delka: ${options.stats.totalDistanceKm} km`;
+    const linesText = `Useky tras: ${options.stats.lineCount}`;
+    const markersText = `Body / stanoviste: ${options.stats.markerCount}`;
+    const polygonsText = options.stats.polygonCount > 0 ? `Zony: ${options.stats.polygonCount}` : '';
+    const statsSummary = [distText, linesText, markersText, polygonsText].filter(Boolean).join('   |   ');
 
-    streamCmds += `BT /F2 9 Tf 0.05 0.2 0.16 rg ${margin + 8} ${statsY + 1} Td (${toPdfAscii(statsSummary)}) Tj ET\n`;
+    streamCmds += `BT /F2 8.5 Tf 0.05 0.2 0.16 rg ${margin + 8} ${statsY + 1} Td (${toPdfAscii(statsSummary)}) Tj ET\n`;
   }
 
   // Border around map image
@@ -140,23 +169,55 @@ export async function createMapPdfBlob(
   // Draw Map Image
   streamCmds += `q ${drawW.toFixed(2)} 0 0 ${drawH.toFixed(2)} ${drawX.toFixed(2)} ${drawY.toFixed(2)} cm /MapImg Do Q\n`;
 
-  // Legend bar at bottom
-  if (options.includeLegend && options.categories.length > 0) {
-    const legendY = margin + 14;
-    streamCmds += `BT /F2 8 Tf 0.2 0.25 0.23 rg ${margin} ${legendY} Td (Kategorie tras:) Tj ET\n`;
+  // Category stats map lookup
+  const statsMap = new Map<string, { distanceKm: number; count: number }>();
+  if (options.stats.categoryStats) {
+    for (const cs of options.stats.categoryStats) {
+      statsMap.set(cs.categoryId, { distanceKm: cs.distanceKm, count: cs.count });
+    }
+  }
 
-    let legendX = margin + 70;
-    for (const cat of options.categories.slice(0, 5)) {
-      if (legendX > pageWidth - margin - 80) break;
-      const catText = `* ${cat.name || cat.shortName}`;
-      streamCmds += `BT /F1 8 Tf 0.3 0.35 0.33 rg ${legendX} ${legendY} Td (${toPdfAscii(catText)}) Tj ET\n`;
-      legendX += 95;
+  // Legend bar at bottom with real colored swatches
+  let currentBottomY = margin + 14;
+
+  if (options.includeSignOff) {
+    const signOffY = margin + 14;
+    // Sign-off line for Police / Emergency Commander
+    streamCmds += `BT /F1 7.5 Tf 0.45 0.55 0.52 rg ${margin} ${signOffY} Td (${toPdfAscii('Urceno pro rizeni provozu a koordinaci slozek IZS.')}) Tj ET\n`;
+    const signLineText = 'Podpis velitele bezp. opatreni: ........................................';
+    streamCmds += `BT /F2 7.5 Tf 0.25 0.35 0.32 rg ${pageWidth - margin - 230} ${signOffY} Td (${toPdfAscii(signLineText)}) Tj ET\n`;
+    currentBottomY += 16;
+  }
+
+  if (options.includeLegend && options.categories.length > 0) {
+    const legendY = currentBottomY;
+    streamCmds += `BT /F2 8 Tf 0.1 0.2 0.18 rg ${margin} ${legendY} Td (LEGENDA TRAS:) Tj ET\n`;
+
+    let legendX = margin + 78;
+    // Show categories
+    for (const cat of options.categories.slice(0, 6)) {
+      if (legendX > pageWidth - margin - 90) break;
+      const rgb = hexToPdfRgb(cat.color);
+      const catStat = statsMap.get(cat.id);
+
+      // Draw colored vector rectangle swatch
+      streamCmds += `q ${rgb.r} ${rgb.g} ${rgb.b} rg ${legendX} ${legendY - 1} 10 7 re f Q\n`;
+      streamCmds += `q 0.1 0.2 0.18 RG 0.5 w ${legendX} ${legendY - 1} 10 7 re S Q\n`;
+
+      const distPart = catStat && catStat.distanceKm > 0 ? ` (${catStat.distanceKm} km)` : '';
+      const catLabel = `${cat.name}${distPart}`;
+
+      streamCmds += `BT /F1 7.5 Tf 0.2 0.3 0.28 rg ${legendX + 13} ${legendY} Td (${toPdfAscii(catLabel)}) Tj ET\n`;
+
+      // Advance X based on label length
+      const itemWidth = Math.max(90, Math.min(130, catLabel.length * 5.5 + 24));
+      legendX += itemWidth;
     }
   }
 
   // Footer: copyright / credits
-  const footerText = 'Vytvoreno v aplikaci CRP (endurovojta173)';
-  streamCmds += `BT /F1 7 Tf 0.55 0.6 0.58 rg ${pageWidth - margin - 150} ${margin} Td (${toPdfAscii(footerText)}) Tj ET\n`;
+  const footerText = 'CRP - Complex Route Planning App (endurovojta173)';
+  streamCmds += `BT /F1 7 Tf 0.55 0.6 0.58 rg ${pageWidth - margin - 170} ${margin - 2} Td (${toPdfAscii(footerText)}) Tj ET\n`;
 
   const textEncoder = new TextEncoder();
   const streamBytes = textEncoder.encode(streamCmds);

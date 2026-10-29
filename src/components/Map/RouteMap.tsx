@@ -488,6 +488,19 @@ export function RouteMap({
 
         <div class="popup-instruction">Barva / typ:</div>
         <div class="popup-buttons-grid"></div>
+
+        <div class="popup-danger-section">
+          <button type="button" class="popup-delete-layer-btn" title="Odstranit tento prvek z mapy">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+              <line x1="10" y1="11" x2="10" y2="17"/>
+              <line x1="14" y1="11" x2="14" y2="17"/>
+            </svg>
+            <span>Odstranit ${isMarker ? 'tento bod' : isPolygon ? 'tuto oblast' : 'tuto trasu'}</span>
+          </button>
+        </div>
       `;
 
       const nameInput = container.querySelector('.popup-name-input') as HTMLInputElement | null;
@@ -639,6 +652,26 @@ export function RouteMap({
         });
       }
 
+      const deleteBtn = container.querySelector('.popup-delete-layer-btn') as HTMLButtonElement | null;
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const itemLabel = isMarker ? 'tento bod' : isPolygon ? 'tuto oblast' : 'tuto trasu';
+          if (window.confirm(`Opravdu chcete odstranit ${itemLabel} z mapy?`)) {
+            const oldGroup = arrowLayersMapRef.current.get(layer);
+            if (oldGroup && arrowsContainerRef.current) {
+              arrowsContainerRef.current.removeLayer(oldGroup);
+              arrowLayersMapRef.current.delete(layer);
+            }
+            if (drawnItemsRef.current?.hasLayer(layer)) {
+              drawnItemsRef.current.removeLayer(layer);
+            }
+            mapInstanceRef.current?.closePopup();
+            syncLayers();
+          }
+        });
+      }
+
       return container;
     },
     [syncLayers, updateLayerCategory, updateLayerArrows, reversePolylineDirection]
@@ -742,10 +775,11 @@ export function RouteMap({
 
   // Initialize Map and Geoman
   useEffect(() => {
-    if (!mapContainerRef.current) return;
+    const mapContainer = mapContainerRef.current;
+    if (!mapContainer) return;
 
     // Center on central Europe default (Prague) with nice overview
-    const map = L.map(mapContainerRef.current, {
+    const map = L.map(mapContainer, {
       center: [50.0755, 14.4378],
       zoom: 13,
       zoomControl: false,
@@ -867,8 +901,18 @@ export function RouteMap({
       setTimeout(syncLayers, 20);
     };
 
+    const handleGlobalRemovalModeToggle = (e: { enabled: boolean }) => {
+      if (!mapContainerRef.current) return;
+      if (e.enabled) {
+        mapContainerRef.current.classList.add('cursor-eraser-mode');
+      } else {
+        mapContainerRef.current.classList.remove('cursor-eraser-mode');
+      }
+    };
+
     map.on('pm:create', handlePmCreate);
     map.on('pm:remove', handlePmRemove);
+    map.on('pm:globalremovalmodetoggled', handleGlobalRemovalModeToggle);
 
     // Load saved GeoJSON from localStorage on mount
     const savedGeoJson = loadGeoJsonFromStorage();
@@ -970,6 +1014,8 @@ export function RouteMap({
     return () => {
       map.off('mousemove', handleMapMouseMove);
       map.off('click', handleMapClick);
+      map.off('pm:globalremovalmodetoggled', handleGlobalRemovalModeToggle);
+      mapContainer.classList.remove('cursor-eraser-mode');
       if (previewSnapMarkerRef.current && map.hasLayer(previewSnapMarkerRef.current)) {
         map.removeLayer(previewSnapMarkerRef.current);
         previewSnapMarkerRef.current = null;

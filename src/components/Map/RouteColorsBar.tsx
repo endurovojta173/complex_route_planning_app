@@ -66,13 +66,21 @@ export function RouteColorsBar({
               type="button"
               className={`left-tool-btn color-item-btn ${isActive ? 'is-active' : ''}`}
               onClick={() => onSelectCategory(cat)}
-              title={`${cat.name} — Kliknutím vybrat pro kreslení`}
-              aria-label={`Barva kreslení: ${cat.name}`}
+              title={`${cat.name} — ${isActive ? 'Aktuálně vybraná barva' : 'Kliknutím vybrat pro kreslení'}`}
+              aria-label={`Barva kreslení: ${cat.name}${isActive ? ' (vybrána)' : ''}`}
             >
               <span
                 className="color-tool-swatch"
                 style={{ backgroundColor: cat.color }}
-              />
+              >
+                {isActive && (
+                  <Check
+                    size={11}
+                    strokeWidth={3.5}
+                    className="color-tool-swatch-check"
+                  />
+                )}
+              </span>
             </button>
 
             {/* Flyout actions on hover: Name, Rename and Remove */}
